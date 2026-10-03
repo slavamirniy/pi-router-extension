@@ -33,7 +33,7 @@ async function remoteModels(baseURL,key,fetcher,timeout) {
     finally { await reader.cancel().catch(()=>{}); reader.releaseLock(); }
     const body=JSON.parse(text);
     if(!Array.isArray(body.data)||body.has_more===true||body.data.length>5000||body.data.some(m=>!m||typeof m.id!=='string'||!/^[a-zA-Z0-9_.:/-]{1,128}$/.test(m.id))) throw new Error('Incomplete catalogue');
-    return {data:body.data,authoritative:response.headers.get('x-router-catalog')==='v1'};
+    return {data:body.data};
   } finally { clearTimeout(timer); }
 }
 
@@ -55,7 +55,7 @@ export async function configure(options, dependencies={}) {
   if(typeof key!=='string'||!key||/[\r\n\0]/.test(key)) throw new Error('Set PI_API_KEY to your client API key');
   const template={...existing,api:'openai-completions',baseUrl:baseURL};
   let discovered=Array.isArray(existing?.models)?existing.models:[],refreshed=false;
-  try { const catalog=await remoteModels(baseURL,key,dependencies.fetch??globalThis.fetch,dependencies.timeout??10000); discovered=mergeModels(discovered,catalog.data,template,catalog.authoritative);refreshed=true; }
+  try { const catalog=await remoteModels(baseURL,key,dependencies.fetch??globalThis.fetch,dependencies.timeout??10000); discovered=mergeModels(discovered,catalog.data,template);refreshed=true; }
   catch { /* Offline installation keeps the previous list; startup can refresh later. */ }
   models.providers[provider]={...template,apiKey:key,models:discovered};
   let selected=options.defaultModel || undefined;
