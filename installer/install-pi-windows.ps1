@@ -9,7 +9,7 @@ $TaskProvider = if ($env:PI_PROVIDER_NAME) { $env:PI_PROVIDER_NAME } else { 'rou
 $TaskDefault = $env:PI_DEFAULT_MODEL
 $TaskConfigDir = $env:PI_CODING_AGENT_DIR
 Remove-Item Env:PI_API_KEY,Env:PI_BASE_URL,Env:PI_PROVIDER_NAME,Env:PI_DEFAULT_MODEL -ErrorAction SilentlyContinue
-$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/2842f07e84c19343c20eda3bee93b86b14e22d35'
+$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/84fbad3027aed51e3e4cf01358dd296cc916a8a6'
 if ([string]::IsNullOrWhiteSpace($TaskBase)) { throw 'Set PI_BASE_URL to your API address, including /v1.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 function Write-Ok([string]$Message) {
@@ -227,11 +227,11 @@ if ($env:PI_SKIP_INSTALL -ne '1') {
 $TaskTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $TaskTemp = Join-Path $TaskTempRoot ('pi-router-install.' + [guid]::NewGuid().ToString('N'))
 $TaskManifest = @{
-    'index.ts' = 'b2c17464e4cc49e513a094a8657f645bd832ebe11d46216d9fab42dc9a391d8e'
-    'models.mjs' = 'a935344ee0ad71ad2daabc3c003cb89351e68af8aa720d17b845a36f2edb74d5'
+    'index.ts' = '96cf696860a00cddc2723ab9bdee323a3c6e6afdb801b62b5bfd21ac33019788'
+    'models.mjs' = 'fe484ac7229d50a343ec06e810bca31eba722abdb84d5bb803d8267839ffbe8a'
     'progress.mjs' = '3590b43cb261209a4cc4eb36de959e6112802286e2750ee778380341b31e0dc0'
     'safety.mjs' = '76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba'
-    'installer/configure.mjs' = '34e5514f043c43e6ed492ad2192c63a8a7eab7a4b54014952ebfd70f1f7d840d'
+    'installer/configure.mjs' = 'e8bdd8134b5eda578a791a3d2e9154ababc1fc9af5e2f29f44f6e0145fc79633'
 }
 try {
     foreach ($TaskFile in $TaskManifest.Keys) {
