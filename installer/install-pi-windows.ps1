@@ -240,6 +240,10 @@ try {
         if ((Get-InstallerSHA256 $TaskTarget) -ne $TaskManifest[$TaskFile]) { throw 'Extension integrity check failed.' }
     }
     $TaskPayload = @{ apiKey=$TaskKey; baseURL=$TaskBase; provider=$TaskProvider; defaultModel=$TaskDefault; configDir=$TaskConfigDir } | ConvertTo-Json -Compress
+    # Windows PowerShell can use an inherited ASCII pipeline encoding inside a
+    # function invoked through iex. ASCII JSON escapes preserve Unicode paths
+    # and credentials regardless of the caller's console/pipeline code page.
+    $TaskPayload = [regex]::Replace($TaskPayload, '[^\x00-\x7F]', { param($match) '\u{0:x4}' -f [int][char]$match.Value[0] })
     $TaskNode = Get-Command node.exe -ErrorAction Stop
     $TaskPreviousEncoding = $OutputEncoding
     try {

@@ -12,7 +12,7 @@ function Install-Pi {
     $env:PI_BASE_URL = $Base
     $env:PI_DEFAULT_MODEL = $Model
     try {
-        Invoke-RestMethod 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.6/installer/install-pi-windows.ps1' | Invoke-Expression
+        Invoke-RestMethod 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.7/installer/install-pi-windows.ps1' | Invoke-Expression
     } finally {
         Remove-Item Env:PI_API_KEY,Env:PI_BASE_URL,Env:PI_DEFAULT_MODEL -ErrorAction SilentlyContinue
     }

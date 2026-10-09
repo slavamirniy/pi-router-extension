@@ -1,6 +1,6 @@
 {
   "name": "pi-router-extension",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "description": "Universal model discovery and optional router progress for pi",
   "license": "MIT",
