@@ -60,7 +60,7 @@ export async function configure(options, dependencies={}) {
   models.providers[provider]={...template,apiKey:key,models:discovered};
   let selected=options.defaultModel || undefined;
   if(selected&&!discovered.some(m=>m.id===selected)) throw new Error('PI_DEFAULT_MODEL is not present in the available catalogue');
-  selected??=settings.defaultProvider===provider&&discovered.some(m=>m.id===settings.defaultModel)?settings.defaultModel:discovered[0]?.id;
+  selected??=settings.defaultProvider===provider&&discovered.some(m=>m.id===settings.defaultModel)?settings.defaultModel:discovered.find(m=>/^kimi[-_.]?k3$/i.test(m.id.split('/').at(-1)))?.id ?? discovered[0]?.id;
   if(selected){settings.defaultProvider=provider;settings.defaultModel=selected;}
   const contents=await Promise.all(extensionFiles.map(file=>fs.readFile(path.join(source,file))));
   const stamp=`${Date.now()}.${process.pid}`,destination=path.join(configDir,'extensions','llmsrouter-progress');

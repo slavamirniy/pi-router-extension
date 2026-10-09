@@ -26,6 +26,14 @@ test('reinstall replaces this provider models and preserves other providers, set
  assert.ok((await fs.readdir(dir)).some(f=>f.startsWith('models.json.bak.')));
  const result=await configure(options,{fetch:async()=>{throw new Error('offline')}});assert.equal(result.refreshed,false);assert.equal(result.models,1);
 });
+test('fresh install selects Kimi K3 ahead of MiniMax and explicit model still wins',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'pi-install-kimi-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const options={apiKey:'synthetic',baseURL:'https://api.example/v1',configDir:dir};
+ const deps={fetch:async()=>new Response(JSON.stringify({data:[{id:'MiniMax-M3'},{id:'kimi-k3'}]}))};
+ assert.equal((await configure(options,deps)).defaultModel,'kimi-k3');
+ assert.equal((await configure({...options,defaultModel:'MiniMax-M3'},deps)).defaultModel,'MiniMax-M3');
+});
+
 test('empty catalogue without router headers is honored; mismatched provider or bad JSON cannot overwrite config',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'pi-install-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
  const options={apiKey:'synthetic',baseURL:'https://api.example/v1',configDir:dir};
