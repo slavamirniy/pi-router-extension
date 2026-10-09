@@ -15,10 +15,10 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/mai
 Обычная командная строка CMD автоматически запустит встроенный PowerShell:
 
 ```cmd
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $env:PI_API_KEY='KEY'; $env:PI_BASE_URL='https://YOUR_API/v1'; $env:PI_DEFAULT_MODEL='kimi-k3'; irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.3/installer/install-pi-windows.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.4/i.ps1|iex; Install-Pi 'KEY' 'https://YOUR_API/v1' 'kimi-k3'"
 ```
 
-Замените ключ и адрес API. Это пример для CMD; бот выдаёт персональную команду с `-EncodedCommand`, которая работает и в CMD, и в PowerShell и сохраняет специальные символы в ключе. Кодировка команды не скрывает ключ: не пересылайте её другим людям.
+Замените ключ и адрес API. Команда работает в CMD и PowerShell. Бот подставляет значения автоматически; редкие значения со специальными символами оболочки передаёт через безопасную кодированную форму. Команда содержит ключ: не пересылайте её другим людям.
 
 Для PowerShell также доступна короткая форма:
 
