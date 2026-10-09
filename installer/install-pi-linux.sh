@@ -13,7 +13,7 @@ TASK_PROVIDER="${PI_PROVIDER_NAME:-router}"
 TASK_DEFAULT_MODEL="${PI_DEFAULT_MODEL:-}"
 TASK_CONFIG_DIR="${PI_CODING_AGENT_DIR:-}"
 unset PI_API_KEY PI_BASE_URL PI_PROVIDER_NAME PI_DEFAULT_MODEL
-TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/f2db9fb7421192b04d113d44f4ef43bd51a06ac9"
+TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/61896fc72b35e4ee01b0e7ac5824388f38169d51"
 [[ -n "$TASK_BASE_URL" ]] || { echo 'Set PI_BASE_URL to your API address, including /v1.' >&2; exit 1; }
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -234,7 +234,28 @@ index.ts 96cf696860a00cddc2723ab9bdee323a3c6e6afdb801b62b5bfd21ac33019788
 models.mjs fe484ac7229d50a343ec06e810bca31eba722abdb84d5bb803d8267839ffbe8a
 progress.mjs 3590b43cb261209a4cc4eb36de959e6112802286e2750ee778380341b31e0dc0
 safety.mjs 76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba
-installer/configure.mjs 8d9e00f8a2d4e763bbb8b6bc2734c89448d121b3ae88dd0bfe828a6971a96837
+installer/configure.mjs 05baf93605429026e37a06b4ee35e1121100dc1877f191e87cbfcf9d14d529e9
+installer/friendly.mjs 5b3fd6778d5aec49aa27676c2409ebfe998a0e72c9c57c5eac2ee2eacd18f49e
+installer/pi-friendly/bundle.json 92ca6c017638545726b40a8776c4da00da44f6158b9b29adb778cdb37b394f6a
+installer/pi-friendly/activity.mjs 88e5d10d5f4058038744f5ed9787edc81bb2e0990288bfed172d4216f8d9fb8c
+installer/pi-friendly/buttons.mjs 870d02159a8d3fa90f400276459bae9cfeb91b443b10b6322358dcb53223ae46
+installer/pi-friendly/errors.mjs 567914532d7fc26c9203fec036a87419f70b039e1b6e6e65e06edcdb0bf2c327
+installer/pi-friendly/exit-dialog.mjs e85803f9c57bd95c8b9f8040da386cc53ee3ded41decead873464cfd2601e01c
+installer/pi-friendly/friendly.mjs 3b8881b2121d2750f4d6ff416f60278d2020f2596dff378f7c91fea14516295e
+installer/pi-friendly/index.ts cbb2eddb3f8b7e723a17f7b66cf9f7c780e10ddac75bdf78c17df728fd294e51
+installer/pi-friendly/LICENSE 94a5c5d74147e19c336747bda0baa9c923363cb3fac320f95743cba72a59d186
+installer/pi-friendly/menu.mjs 1780b88576fdcf454b9245cd6d03c1a7e546bca9da3e610e97617371a562ba0c
+installer/pi-friendly/mouse.mjs 89a96d8efb03719f430c81d4ae4e2c3a71c25cc17d616f917b84c1c1ca1b7316
+installer/pi-friendly/package.json 667633413dbed53a7d628be614f3372f05912ff111c2d6fc8456ceac6312cf32
+installer/pi-friendly/project-form.mjs 99ab58e81df761612baf5860f93eb358873f435a71419cb27ef8998d7787aa2e
+installer/pi-friendly/projects.mjs f05b74ca86aee59af05c5e34a316ca571466773df1e8d3d611ce3c961e6b4eee
+installer/pi-friendly/README.md e013dba0c222fb6a9728f45359f06a18f069f1636107c592186d1b737533ec14
+installer/pi-friendly/surface.mjs 5c9f4c9f5ad6189ae462ccd6fbbe0d6e158f9b62e17cd5420bd005a6ea616df7
+installer/pi-friendly/voice_audio.py 659fdd63d58e4d6721ef64aba76ce91994e2704f8c7a0d73bfcc2bfecd762da6
+installer/pi-friendly/voice-setup.mjs c545311ab52c4e1a09cf02662d6c2ae52e8561c0ad05fb6e96f87d83f32b988f
+installer/pi-friendly/voice-worker.py 5e0119a3b732a70ca4019f9dea5c20802892d9b4f3af83750f096c457d94d55d
+installer/pi-friendly/voice.mjs 17cce904c157c2bcb1cf162a66c3c70fded45cf63a8328d6a6e0ddca5f28eb60
+installer/pi-friendly/workspace.mjs 4633ac096a57d37709de536ad37f1b5fad36381feccd74db64e40d0a7a31ae03
 MANIFEST
 printf '%s\0%s\0%s\0%s\0%s\0' "$TASK_API_KEY" "$TASK_BASE_URL" "$TASK_PROVIDER" "$TASK_DEFAULT_MODEL" "$TASK_CONFIG_DIR" | node "$TASK_TMP/installer/configure.mjs"
 unset TASK_API_KEY

@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/mai
 Откройте «Терминал» через Spotlight (⌘ Space) и вставьте:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.5/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
+curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.6/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
 ```
 
 На рабочем столе появится «AI своими руками» с иконкой молотка. Значок открывает pi в Терминале; проекты сохраняются в `~/Documents/AI DIY Projects`. Установка на существующий pi обновляет расширение и настройки. Создание macOS-приложения проверяется изолированным тестом, полноценный запуск требует Mac.
@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.
 Нажмите Win + R, вставьте команду и нажмите Enter. Она также работает в CMD и PowerShell:
 
 ```cmd
-powershell -NoProfile -c "irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.5/i.ps1|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
+powershell -NoProfile -c "irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.6/i.ps1|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
 ```
 
 Замените ключ и адрес API. Если итоговая строка длиннее 250 символов, вставляйте её в CMD или PowerShell. По умолчанию выбрана Kimi K3; необязательный третий аргумент задаёт другую модель. Команда работает в CMD и PowerShell. Бот подставляет значения автоматически; редкие значения со специальными символами оболочки передаёт через безопасную кодированную форму. Команда содержит ключ: не пересылайте её другим людям.
@@ -38,13 +38,17 @@ powershell -NoProfile -c "irm https://raw.githubusercontent.com/slavamirniy/pi-r
 $env:PI_API_KEY='KEY'; $env:PI_BASE_URL='https://YOUR_API/v1'; irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/main/installer/install-pi-windows.ps1 | iex
 ```
 
-Установщики ставят Node.js при необходимости, проверенную версию pi **0.84.4**, расширение и конфигурацию API. Плагин скачивается из закреплённого коммита; SHA-256 каждого файла проверяется до запуска. Установщики не отправляют API-ключ на GitHub и не передают его npm. Ключ сохраняется в личном `~/.pi/agent/models.json` для дальнейшей работы pi; файлы Unix имеют права 600. Предыдущие настройки сохраняются в резервные копии. Остальные провайдеры и настройки сохраняются.
+Установщики ставят Node.js при необходимости, проверенную версию pi **0.84.4**, плагин квоты, интерфейс **Просто pi 0.8.2** и конфигурацию API. Плагин скачивается из закреплённого коммита; SHA-256 каждого файла проверяется до запуска. Установщики не отправляют API-ключ на GitHub и не передают его npm. Ключ сохраняется в личном `~/.pi/agent/models.json` для дальнейшей работы pi; файлы Unix имеют права 600. Предыдущие настройки сохраняются в резервные копии. Остальные провайдеры и настройки сохраняются.
 
 `PI_BASE_URL` обязателен и включает API-путь, например `/v1`. `PI_PROVIDER_NAME` — необязательное имя подключения (по умолчанию `router`); `PI_DEFAULT_MODEL` — необязательный ID из полученного каталога. `PI_CODING_AGENT_DIR` позволяет указать другую папку pi. Если имя подключения уже занято другим URL, установщик попросит выбрать новое имя.
 
 После установки pi запускается автоматически. `PI_NO_START=1` отключает запуск; `PI_SKIP_INSTALL=1` позволяет только обновить расширение и настройки, когда поддерживаемый pi уже установлен. В текущем pi используйте `/reload`.
 
-Для установки только плагина в существующий pi:
+Повторная установка обновляет оба плагина. Проекты, история, настройки интерфейса и сторонние провайдеры сохраняются; прежняя версия UI остаётся в `~/.pi/agent/backups`. Из глобальных настроек убираются прежние регистрации того же `pi-friendly`, чтобы он не загружался дважды. Исходник UI: [pi-friendly](https://github.com/slavamirniy/pi-friendly/tree/a0b4ea4dffd042322df7880772c64930a14add76), MIT; точная версия и контрольные суммы находятся в `installer/pi-friendly/bundle.json`. Git для установки не нужен.
+
+При первом запуске интерфейс автоматически готовит локальный голосовой ввод: загружает среду и модель (~225 МБ плюс зависимости). До окончания подготовки можно пользоваться текстовым вводом. На macOS потребуется разрешение на микрофон.
+
+Для установки только плагина квоты в существующий pi:
 
 ```bash
 pi install git:github.com/slavamirniy/pi-router-extension

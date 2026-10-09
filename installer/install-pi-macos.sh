@@ -9,7 +9,9 @@ TASK_MAC_TMP="$(mktemp -d "${TMPDIR:-/tmp}/ai-diy-install.XXXXXXXX")"
 cleanup_mac() { [[ "${TASK_MAC_TMP##*/}" == ai-diy-install.* ]] && rm -rf -- "$TASK_MAC_TMP"; }
 trap cleanup_mac EXIT
 TASK_ASSETS='https://raw.githubusercontent.com/slavamirniy/pi-router-extension/cc566974dd517f4c438aa84ca6ac05a3eb5defac'
-curl -fsSL --proto '=https' --tlsv1.2 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.3/installer/install-pi-linux.sh' -o "$TASK_MAC_TMP/common.sh"
+curl -fsSL --proto '=https' --tlsv1.2 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.6/installer/install-pi-linux.sh' -o "$TASK_MAC_TMP/common.sh"
+TASK_COMMON_HASH='515ff21e581cd06f2e785fcf942bccca37af3a870c70bc0b32e3e47ee68f28f2'
+[[ "$(shasum -a 256 "$TASK_MAC_TMP/common.sh" | cut -d ' ' -f 1)" == "$TASK_COMMON_HASH" ]] || { echo 'Installer integrity check failed.' >&2; exit 1; }
 bash "$TASK_MAC_TMP/common.sh"
 unset PI_API_KEY PI_BASE_URL PI_DEFAULT_MODEL
 if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
