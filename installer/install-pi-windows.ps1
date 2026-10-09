@@ -9,7 +9,7 @@ $TaskProvider = if ($env:PI_PROVIDER_NAME) { $env:PI_PROVIDER_NAME } else { 'rou
 $TaskDefault = $env:PI_DEFAULT_MODEL
 $TaskConfigDir = $env:PI_CODING_AGENT_DIR
 Remove-Item Env:PI_API_KEY,Env:PI_BASE_URL,Env:PI_PROVIDER_NAME,Env:PI_DEFAULT_MODEL -ErrorAction SilentlyContinue
-$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/84fbad3027aed51e3e4cf01358dd296cc916a8a6'
+$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/f2db9fb7421192b04d113d44f4ef43bd51a06ac9'
 if ([string]::IsNullOrWhiteSpace($TaskBase)) { throw 'Set PI_BASE_URL to your API address, including /v1.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 function Write-Ok([string]$Message) {
@@ -83,57 +83,25 @@ function Install-NodeIfNeeded {
         return
     }
 
-    if ($nodeVersion) {
-        Write-Warn "Node.js v$nodeVersion is too old. Pi requires Node.js $MinimumNodeVersion or newer."
-    }
-
-    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-    if (-not $winget) {
-        throw 'A supported Node.js version was not found and winget is unavailable. Install the current Node.js LTS and run the installer again.'
-    }
-
-    Write-Step 'Installing or upgrading Node.js LTS through winget'
-
-    if ($nodeVersion) {
-        & $winget.Source upgrade `
-            --id OpenJS.NodeJS.LTS `
-            --exact `
-            --source winget `
-            --accept-package-agreements `
-            --accept-source-agreements `
-            --silent `
-            --disable-interactivity
-
-        if ($LASTEXITCODE -ne 0) {
-            & $winget.Source install `
-                --id OpenJS.NodeJS.LTS `
-                --exact `
-                --source winget `
-                --accept-package-agreements `
-                --accept-source-agreements `
-                --silent `
-                --disable-interactivity
-        }
-    }
-    else {
-        & $winget.Source install `
-            --id OpenJS.NodeJS.LTS `
-            --exact `
-            --source winget `
-            --accept-package-agreements `
-            --accept-source-agreements `
-            --silent `
-            --disable-interactivity
-    }
-
-    Refresh-ProcessPath
+    Write-Step 'Installing a private Node.js runtime with npm'
+    $taskArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { 'arm64' } else { 'x64' }
+    $taskRuntimeName = "node-v22.22.2-win-$taskArch"
+    $taskRuntimeRoot = Join-Path $env:LOCALAPPDATA 'pi-runtime'
+    $taskRuntimePath = Join-Path $taskRuntimeRoot $taskRuntimeName
+    New-Item -ItemType Directory -Path $taskRuntimeRoot -Force | Out-Null
+    $taskArchive = Join-Path $taskRuntimeRoot "$taskRuntimeName.zip"
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v22.22.2/$taskRuntimeName.zip" -OutFile $taskArchive
+        $taskSums = (Invoke-WebRequest -UseBasicParsing -Uri 'https://nodejs.org/dist/v22.22.2/SHASUMS256.txt').Content
+        $taskHashLine = $taskSums -split "`n" | Where-Object { $_.Trim().EndsWith(" $taskRuntimeName.zip") } | Select-Object -First 1
+        if (-not $taskHashLine -or (Get-FileHash -LiteralPath $taskArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne ($taskHashLine.Trim() -split '\s+')[0]) { throw 'Node.js integrity check failed.' }
+        Expand-Archive -LiteralPath $taskArchive -DestinationPath $taskRuntimeRoot -Force
+    } finally { if (Test-Path -LiteralPath $taskArchive) { Remove-Item -LiteralPath $taskArchive -Force } }
+    Add-UserPathEntry -Entry $taskRuntimePath
+    $env:Path = "$taskRuntimePath;$env:Path"
     $nodeVersion = Get-InstalledNodeVersion
     $npm = Get-NpmCommand
-
-    if (-not $nodeVersion -or -not $npm -or $nodeVersion -lt $MinimumNodeVersion) {
-        throw 'Node.js was installed or upgraded, but the required version is not available in the current PowerShell session. Close PowerShell, open it again, and rerun the installer.'
-    }
-
+    if (-not $nodeVersion -or -not $npm -or $nodeVersion -lt $MinimumNodeVersion) { throw 'Private Node.js runtime could not be initialized.' }
     Write-Ok "Node.js v$nodeVersion, npm $((& $npm.Source --version).Trim())"
 }
 
@@ -231,7 +199,7 @@ $TaskManifest = @{
     'models.mjs' = 'fe484ac7229d50a343ec06e810bca31eba722abdb84d5bb803d8267839ffbe8a'
     'progress.mjs' = '3590b43cb261209a4cc4eb36de959e6112802286e2750ee778380341b31e0dc0'
     'safety.mjs' = '76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba'
-    'installer/configure.mjs' = 'e8bdd8134b5eda578a791a3d2e9154ababc1fc9af5e2f29f44f6e0145fc79633'
+    'installer/configure.mjs' = '8d9e00f8a2d4e763bbb8b6bc2734c89448d121b3ae88dd0bfe828a6971a96837'
 }
 try {
     foreach ($TaskFile in $TaskManifest.Keys) {
