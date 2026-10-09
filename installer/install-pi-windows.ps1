@@ -232,9 +232,36 @@ try {
     if (Test-Path -LiteralPath $TaskResolved) { Remove-Item -LiteralPath $TaskResolved -Recurse -Force }
     $TaskKey=$null
 }
+function Install-DesktopShortcut {
+    $taskBrandRoot = Join-Path $env:LOCALAPPDATA 'AI-DIY'
+    $taskProjects = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'AI DIY Projects'
+    $taskDesktop = [Environment]::GetFolderPath('DesktopDirectory')
+    New-Item -ItemType Directory -Path $taskBrandRoot,$taskProjects,$taskDesktop -Force | Out-Null
+    $taskIcon = Join-Path $taskBrandRoot 'ai-diy.ico'
+    Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/cc566974dd517f4c438aa84ca6ac05a3eb5defac/assets/ai-diy.ico' -OutFile $taskIcon
+    if ((Get-InstallerSHA256 $taskIcon) -ne '6075a4bc83a2dfb866c778ebab36ea49ea45647ba2dabb0d45484088a904db6a') { throw 'Desktop icon integrity check failed.' }
+    $taskNodeFolder = Split-Path -Parent (Get-Command node.exe -ErrorAction Stop).Source
+    $taskPiCommand = (Get-PiCommand).Source
+    if (!$taskPiCommand) { throw 'Pi command is unavailable for the desktop shortcut.' }
+    $taskLauncher = Join-Path $taskBrandRoot 'launch.cmd'
+    $taskLaunchText = "@echo off`r`nsetlocal`r`nset `"PATH=" + $taskNodeFolder.Replace('%','%%') + ";" + $UserNpmPrefix.Replace('%','%%') + ";%PATH%`"`r`ncd /d `"" + $taskProjects.Replace('%','%%') + "`"`r`ncall `"" + $taskPiCommand.Replace('%','%%') + "`"`r`nif errorlevel 1 pause`r`n"
+    # cmd reads the system code page; generated paths may contain Cyrillic.
+    [IO.File]::WriteAllText($taskLauncher, "@chcp 65001 >nul`r`n" + $taskLaunchText, [Text.UTF8Encoding]::new($false))
+    $taskShell = New-Object -ComObject WScript.Shell
+    $taskLink = $taskShell.CreateShortcut((Join-Path $taskDesktop 'AI своими руками.lnk'))
+    $taskLink.TargetPath = $env:ComSpec
+    $taskLink.Arguments = '/d /c ""' + $taskLauncher + '""'
+    $taskLink.WorkingDirectory = $taskProjects
+    $taskLink.IconLocation = $taskIcon + ',0'
+    $taskLink.Description = 'AI своими руками'
+    $taskLink.Save()
+    Write-Ok 'Desktop shortcut created. Projects: Documents/AI DIY Projects'
+}
+Install-DesktopShortcut
 if ($env:PI_NO_START -ne '1') {
     Refresh-ProcessPath
     $TaskPi = Get-PiCommand
     if (!$TaskPi) { throw 'Pi is installed. Open a new terminal and run: pi' }
+    Set-Location -LiteralPath (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'AI DIY Projects')
     & $TaskPi.Source
 }
