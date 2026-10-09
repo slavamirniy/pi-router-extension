@@ -1,4 +1,13 @@
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+# A parent PowerShell 7 process can pass its module path to Windows PowerShell.
+$env:PSModulePath = $env:PSModulePath + ';' + (Join-Path $PSHOME 'Modules')
+function Get-InstallerSHA256([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '').ToLowerInvariant() }
+    finally { $sha.Dispose(); $stream.Dispose() }
+}
 $PackageName = '@earendil-works/pi-coding-agent'
 $PackageVersion = '0.84.4'
 $MinimumNodeVersion = [Version]'22.19.0'
@@ -94,7 +103,8 @@ function Install-NodeIfNeeded {
         Invoke-WebRequest -UseBasicParsing -Uri "https://nodejs.org/dist/v22.22.2/$taskRuntimeName.zip" -OutFile $taskArchive
         $taskSums = (Invoke-WebRequest -UseBasicParsing -Uri 'https://nodejs.org/dist/v22.22.2/SHASUMS256.txt').Content
         $taskHashLine = $taskSums -split "`n" | Where-Object { $_.Trim().EndsWith(" $taskRuntimeName.zip") } | Select-Object -First 1
-        if (-not $taskHashLine -or (Get-FileHash -LiteralPath $taskArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne ($taskHashLine.Trim() -split '\s+')[0]) { throw 'Node.js integrity check failed.' }
+        if (-not $taskHashLine -or (Get-InstallerSHA256 $taskArchive) -ne ($taskHashLine.Trim() -split '\s+')[0]) { throw 'Node.js integrity check failed.' }
+        Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Archive/Microsoft.PowerShell.Archive.psd1') -ErrorAction Stop
         Expand-Archive -LiteralPath $taskArchive -DestinationPath $taskRuntimeRoot -Force
     } finally { if (Test-Path -LiteralPath $taskArchive) { Remove-Item -LiteralPath $taskArchive -Force } }
     Add-UserPathEntry -Entry $taskRuntimePath
@@ -206,7 +216,7 @@ try {
         $TaskTarget = Join-Path $TaskTemp $TaskFile
         New-Item -ItemType Directory -Path (Split-Path -Parent $TaskTarget) -Force | Out-Null
         Invoke-WebRequest -UseBasicParsing -Uri "$TaskSource/$TaskFile" -OutFile $TaskTarget
-        if ((Get-FileHash -LiteralPath $TaskTarget -Algorithm SHA256).Hash.ToLowerInvariant() -ne $TaskManifest[$TaskFile]) { throw 'Extension integrity check failed.' }
+        if ((Get-InstallerSHA256 $TaskTarget) -ne $TaskManifest[$TaskFile]) { throw 'Extension integrity check failed.' }
     }
     $TaskPayload = @{ apiKey=$TaskKey; baseURL=$TaskBase; provider=$TaskProvider; defaultModel=$TaskDefault; configDir=$TaskConfigDir } | ConvertTo-Json -Compress
     $TaskNode = Get-Command node.exe -ErrorAction Stop

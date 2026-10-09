@@ -12,6 +12,16 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/mai
 
 ## Установка Windows
 
+Обычная командная строка CMD автоматически запустит встроенный PowerShell:
+
+```cmd
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; $env:PI_API_KEY='KEY'; $env:PI_BASE_URL='https://YOUR_API/v1'; $env:PI_DEFAULT_MODEL='kimi-k3'; irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.3/installer/install-pi-windows.ps1 | iex"
+```
+
+Замените ключ и адрес API. Это пример для CMD; бот выдаёт персональную команду с `-EncodedCommand`, которая работает и в CMD, и в PowerShell и сохраняет специальные символы в ключе. Кодировка команды не скрывает ключ: не пересылайте её другим людям.
+
+Для PowerShell также доступна короткая форма:
+
 ```powershell
 $env:PI_API_KEY='KEY'; $env:PI_BASE_URL='https://YOUR_API/v1'; irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/main/installer/install-pi-windows.ps1 | iex
 ```
