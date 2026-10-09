@@ -1,0 +1,29 @@
+{
+  "name": "pi-friendly",
+  "version": "0.8.2",
+  "type": "module",
+  "description": "Просто pi: понятное меню с мышью и компактный интерфейс",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "node --test *.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/slavamirniy/pi-friendly.git"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "tui",
+    "ux",
+    "mouse"
+  ]
+}

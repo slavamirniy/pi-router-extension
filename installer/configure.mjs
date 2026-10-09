@@ -4,6 +4,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { modelsURL, mergeModels } from '../models.mjs';
+import { prepareFriendly } from './friendly.mjs';
 
 const source = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const extensionFiles = ['index.ts', 'models.mjs', 'progress.mjs', 'safety.mjs'];
@@ -63,13 +64,15 @@ export async function configure(options, dependencies={}) {
   selected??=settings.defaultProvider===provider&&discovered.some(m=>m.id===settings.defaultModel)?settings.defaultModel:discovered.find(m=>/^kimi[-_.]?k3$/i.test(m.id.split('/').at(-1)))?.id ?? discovered[0]?.id;
   if(selected){settings.defaultProvider=provider;settings.defaultModel=selected;}
   const contents=await Promise.all(extensionFiles.map(file=>fs.readFile(path.join(source,file))));
+  const installFriendly=await prepareFriendly(settings,configDir);
   const stamp=`${Date.now()}.${process.pid}`,destination=path.join(configDir,'extensions','llmsrouter-progress');
   await fs.mkdir(configDir,{recursive:true,mode:0o700});
   await backup(modelsFile,stamp);await backup(settingsFile,stamp);
+  await installFriendly(stamp);
   for(let i=0;i<extensionFiles.length;i++) {const file=path.join(destination,extensionFiles[i]);await backup(file,stamp);await atomic(file,contents[i]);}
   await atomic(modelsFile,JSON.stringify(models,null,2)+'\n');
   await atomic(settingsFile,JSON.stringify(settings,null,2)+'\n');
-  return {provider,models:discovered.length,refreshed,defaultModel:selected,extensionInstalled:true};
+  return {provider,models:discovered.length,refreshed,defaultModel:selected,extensionInstalled:true,uiInstalled:true};
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
@@ -77,7 +80,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     const input=readFileSync(0,'utf8');
     const options=input.includes('\0')?Object.fromEntries(['apiKey','baseURL','provider','defaultModel','configDir'].map((k,i)=>[k,input.split('\0')[i]||undefined])):JSON.parse(input);
     const result=await configure(options);
-    console.log(`Pi configured: ${result.provider}, ${result.models} models. Extension installed.`);
+    console.log(`Pi configured: ${result.provider}, ${result.models} models. UI and quota extensions installed.`);
     if(!result.refreshed) console.warn('Model list could not be refreshed. Previous models retained; pi will try again on startup.');
     if(!result.models) console.warn('No models available yet. Check the API address/key and run /models-refresh in pi.');
   } catch(error) { console.error(`Installation stopped: ${error.message?.includes('PI_')||error.message?.includes('configuration')?error.message:'Could not configure pi; existing files were preserved where possible.'}`);process.exitCode=1; }
