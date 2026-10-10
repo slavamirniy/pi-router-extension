@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/mai
 Откройте «Терминал» через Spotlight (⌘ Space) и вставьте:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.8/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
+curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.9/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
 ```
 
 На рабочем столе появится «AI своими руками» с иконкой молотка. Значок открывает pi в Терминале; проекты сохраняются в `~/Documents/AI DIY Projects`. Установка на существующий pi обновляет расширение и настройки. Создание macOS-приложения проверяется изолированным тестом, полноценный запуск требует Mac.
@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.
 Нажмите Win + R, вставьте команду и нажмите Enter. Она также работает в CMD и PowerShell:
 
 ```cmd
-powershell -NoProfile -c "irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.8/i.ps1|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
+powershell -NoP -NoExit -c "[Net.ServicePointManager]::SecurityProtocol=3072;irm https://aipipego.com/i.ps1|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
 ```
 
 Замените ключ и адрес API. Если итоговая строка длиннее 250 символов, вставляйте её в CMD или PowerShell. По умолчанию выбрана Kimi K3; необязательный третий аргумент задаёт другую модель. Команда работает в CMD и PowerShell. Бот подставляет значения автоматически; редкие значения со специальными символами оболочки передаёт через безопасную кодированную форму. Команда содержит ключ: не пересылайте её другим людям.
@@ -38,7 +38,7 @@ powershell -NoProfile -c "irm https://raw.githubusercontent.com/slavamirniy/pi-r
 $env:PI_API_KEY='KEY'; $env:PI_BASE_URL='https://YOUR_API/v1'; irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/main/installer/install-pi-windows.ps1 | iex
 ```
 
-Установщики ставят Node.js при необходимости, проверенную версию pi **0.84.4**, плагин квоты, интерфейс **Просто pi 0.8.2** и конфигурацию API. Плагин скачивается из закреплённого коммита; SHA-256 каждого файла проверяется до запуска. Установщики не отправляют API-ключ на GitHub и не передают его npm. Ключ сохраняется в личном `~/.pi/agent/models.json` для дальнейшей работы pi; файлы Unix имеют права 600. Предыдущие настройки сохраняются в резервные копии. Остальные провайдеры и настройки сохраняются.
+Установщики сохраняют уже установленный работающий pi без обновления через npm. Если pi отсутствует, ставят Node.js при необходимости и проверенную версию pi **0.84.4**. Затем устанавливают плагин квоты, интерфейс **Просто pi 0.8.2** и конфигурацию API. Плагин скачивается из закреплённого коммита; SHA-256 каждого файла проверяется до запуска. Установщики не отправляют API-ключ на GitHub и не передают его npm. Ключ сохраняется в личном `~/.pi/agent/models.json` для дальнейшей работы pi; файлы Unix имеют права 600. Предыдущие настройки сохраняются в резервные копии. Остальные провайдеры и настройки сохраняются.
 
 `PI_BASE_URL` обязателен и включает API-путь, например `/v1`. `PI_PROVIDER_NAME` — необязательное имя подключения (по умолчанию `router`); `PI_DEFAULT_MODEL` — предпочтительная модель из полученного каталога. Если её нет, выбирается доступная модель. `PI_CODING_AGENT_DIR` позволяет указать другую папку pi.
 
@@ -78,3 +78,5 @@ npm test
 Проверены произвольные адреса/имена, обычный API без дополнительных endpoint'ов, отказ сети, сохранение сторонних моделей, пустой авторитетный каталог, прерывание генерации, обновление квоты и изолированная установка. Для полноценного Linux-прогона нужен Linux; Bash-сценарий также проверяется Git Bash на Windows.
 
 Лицензия MIT.
+
+Windows-команда из бота скачивает публичные файлы с aipipego.com, включает TLS 1.2 до загрузки и оставляет окно открытым. Конфигурации с комментариями `//` и запятыми в конце поддерживаются, как в pi; повреждённые файлы не перезаписываются.

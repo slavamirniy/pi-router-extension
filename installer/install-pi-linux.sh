@@ -13,7 +13,7 @@ TASK_PROVIDER="${PI_PROVIDER_NAME:-router}"
 TASK_DEFAULT_MODEL="${PI_DEFAULT_MODEL:-}"
 TASK_CONFIG_DIR="${PI_CODING_AGENT_DIR:-}"
 unset PI_API_KEY PI_BASE_URL PI_PROVIDER_NAME PI_DEFAULT_MODEL
-TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/bc8698f83c66fcec7b6e520debb4ef284607ba5f"
+TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/bc197a92b5ab172a4ab85537338da70070f1e4b1"
 [[ -n "$TASK_BASE_URL" ]] || { echo 'Set PI_BASE_URL to your API address, including /v1.' >&2; exit 1; }
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -171,6 +171,11 @@ ensure_npm_bin_on_path() {
 }
 
 install_or_update_pi() {
+  local installed_version
+  if command -v pi >/dev/null 2>&1 && installed_version="$(pi --version 2>/dev/null)" && [[ "$installed_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    ok "Using installed Pi $installed_version. Updating connection and plugins only."
+    return 0
+  fi
   step "Installing or updating Pi"
 
   local log_file
@@ -226,7 +231,7 @@ cleanup() { if [[ -n "${TASK_TMP:-}" && "${TASK_TMP##*/}" == pi-router-install.*
 trap cleanup EXIT
 while read -r file checksum; do
   mkdir -p "$TASK_TMP/$(dirname "$file")"
-  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$TASK_SOURCE/$file" -o "$TASK_TMP/$file"
+  curl --retry 2 --retry-all-errors --retry-delay 1 --connect-timeout 10 --max-time 90 --fail --silent --show-error --location --proto '=https' --tlsv1.2 "$TASK_SOURCE/$file" -o "$TASK_TMP/$file"
   actual="$(node -e 'const fs=require("fs"),crypto=require("crypto"); process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"))' "$TASK_TMP/$file")"
   [[ "$actual" == "$checksum" ]] || { err 'Extension integrity check failed.'; exit 1; }
 done <<'MANIFEST'
@@ -234,7 +239,7 @@ index.ts 96cf696860a00cddc2723ab9bdee323a3c6e6afdb801b62b5bfd21ac33019788
 models.mjs fe484ac7229d50a343ec06e810bca31eba722abdb84d5bb803d8267839ffbe8a
 progress.mjs 3590b43cb261209a4cc4eb36de959e6112802286e2750ee778380341b31e0dc0
 safety.mjs 76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba
-installer/configure.mjs 477644bc17aae032e5a7992463649430eeefc537fb22c5b8d9253f8d4e9b9cb7
+installer/configure.mjs be10058cd2fbe5634ec69d0099edb9587758c0b05d58261818635cf5b6f42d61
 installer/friendly.mjs 5b3fd6778d5aec49aa27676c2409ebfe998a0e72c9c57c5eac2ee2eacd18f49e
 installer/pi-friendly/bundle.json 92ca6c017638545726b40a8776c4da00da44f6158b9b29adb778cdb37b394f6a
 installer/pi-friendly/activity.mjs 88e5d10d5f4058038744f5ed9787edc81bb2e0990288bfed172d4216f8d9fb8c

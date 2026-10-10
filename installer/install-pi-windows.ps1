@@ -18,7 +18,7 @@ $TaskProvider = if ($env:PI_PROVIDER_NAME) { $env:PI_PROVIDER_NAME } else { 'rou
 $TaskDefault = $env:PI_DEFAULT_MODEL
 $TaskConfigDir = $env:PI_CODING_AGENT_DIR
 Remove-Item Env:PI_API_KEY,Env:PI_BASE_URL,Env:PI_PROVIDER_NAME,Env:PI_DEFAULT_MODEL -ErrorAction SilentlyContinue
-$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/bc8698f83c66fcec7b6e520debb4ef284607ba5f'
+$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/bc197a92b5ab172a4ab85537338da70070f1e4b1'
 if ([string]::IsNullOrWhiteSpace($TaskBase)) { throw 'Set PI_BASE_URL to your API address, including /v1.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 function Write-Ok([string]$Message) {
@@ -168,6 +168,19 @@ function Install-OrUpdatePi {
 
     Add-UserPathEntry -Entry $UserNpmPrefix
 
+    $taskExistingPi = Get-PiCommand
+    if ($taskExistingPi) {
+        # Read the process to completion: Select-Object -First inside the native
+        # pipeline can terminate pi.cmd early and report exit -1 on Windows.
+        $taskVersionOutput = @(& $taskExistingPi.Source --version 2>$null)
+        $taskVersionExit = $LASTEXITCODE
+        $taskInstalledVersion = $taskVersionOutput | Select-Object -First 1
+        if ($taskVersionExit -eq 0 -and ([string]$taskInstalledVersion).Trim() -match '^\d+\.\d+\.\d+') {
+            Write-Ok "Using installed Pi $taskInstalledVersion. Updating connection and plugins only."
+            return
+        }
+    }
+
     & $npm.Source install `
         --global `
         --prefix $UserNpmPrefix `
@@ -209,7 +222,7 @@ $TaskManifest = @{
     'models.mjs' = 'fe484ac7229d50a343ec06e810bca31eba722abdb84d5bb803d8267839ffbe8a'
     'progress.mjs' = '3590b43cb261209a4cc4eb36de959e6112802286e2750ee778380341b31e0dc0'
     'safety.mjs' = '76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba'
-    'installer/configure.mjs' = '477644bc17aae032e5a7992463649430eeefc537fb22c5b8d9253f8d4e9b9cb7'
+    'installer/configure.mjs' = 'be10058cd2fbe5634ec69d0099edb9587758c0b05d58261818635cf5b6f42d61'
     'installer/friendly.mjs' = '5b3fd6778d5aec49aa27676c2409ebfe998a0e72c9c57c5eac2ee2eacd18f49e'
     'installer/pi-friendly/bundle.json' = '92ca6c017638545726b40a8776c4da00da44f6158b9b29adb778cdb37b394f6a'
     'installer/pi-friendly/activity.mjs' = '88e5d10d5f4058038744f5ed9787edc81bb2e0990288bfed172d4216f8d9fb8c'
