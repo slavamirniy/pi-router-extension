@@ -11,13 +11,14 @@ export function mouseEvent(data) {
   return m ? { button: Number(m[1]), x: Number(m[2]) - 1, y: Number(m[3]) - 1, press: m[4] === "M" } : undefined;
 }
 
-export function createMenu({ tui, theme, done, title, subtitle = "", items, statuses = () => [], searchable = false, truncate, measure, matchesKey, palette, panel = false, bottom = false }) {
+export function createMenu({ tui, theme, done, title, subtitle = "", items, statuses = () => [], searchable = false, truncate, measure, matchesKey, palette, panel = false, bottom = false, layout = 'cards' }) {
   let query = "", selected = 0, offset = 0, targets = [], dimensions = "", disposed = false;
   const terminal = tui.terminal;
   // Save and restore terminal mouse modes; only capture mouse while this dialog is open.
   const releaseMouse = acquireMouse(terminal);
-  const backItem=panel?items.find(item=>item.kind==='back'):undefined;
-  const filtered = () => items.filter(item => item!==backItem).filter(item => clean(`${item.label} ${item.description ?? ""}`).toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  const backItem=panel||layout==='list'?items.find(item=>item.kind==='back'):undefined;
+  const isAction=item=>item.kind==='primary'||item.kind==='action';
+  const filtered = () => items.filter(item => item!==backItem).filter(item => layout==='list'&&isAction(item)||clean(`${item.label} ${item.description ?? ""}`).toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const close = value => { if (!disposed) { component.dispose(); done(value); } };
   const component = {
     invalidate() {},
@@ -32,6 +33,46 @@ export function createMenu({ tui, theme, done, title, subtitle = "", items, stat
       targets = [];
       const line = text => truncate(text, Math.max(1, width), "");
       if (height < 9 || width < 24) return [line("Увеличьте окно. Esc — назад.")];
+      if(layout==='list') {
+        const p=palette, fg=(text,color)=>p?`\x1b[38;2;${color}m${text}\x1b[39m`:text;
+        const paint=(text,w,selected=false)=>{
+          const fitted=truncate(text,w,'');
+          const row=fitted+' '.repeat(Math.max(0,w-measure(fitted)));
+          return p?`\x1b[48;2;${selected?p.selection||p.bubble:p.canvas}m`+fg(row,p.text)+'\x1b[0m':row;
+        };
+        const cw=Math.min(80,width-4),left=Math.floor((width-cw)/2),rows=Array(height).fill(paint('',width));
+        const put=(y,text,selected=false)=>{if(y>=0&&y<height)rows[y]=paint('',left)+paint(text,cw,selected)+paint('',width-left-cw);};
+        const color=(text,key)=>fg(text,p?.[key]);
+        const list=filtered(),actions=list.filter(isAction),entries=list.filter(item=>!isAction(item));
+        selected=Math.min(selected,Math.max(0,list.length-1));
+        put(0,color(clean(title),'accent'));
+        const close='× Закрыть',closeX=width-11;
+        rows[1]=paint(backItem?'  ← Все проекты':'',closeX)+paint(close,11);
+        targets.push({y:1,x:closeX,end:width,index:-1});
+        if(backItem)targets.push({y:1,x:0,end:Math.min(closeX,18),index:-2});
+        const compact=height<16;
+        if(!compact)put(3,color(clean(subtitle),'muted'));
+        let y=compact?2:5;
+        for(const action of actions){
+          const index=list.indexOf(action);
+          put(y,color((selected===index?'› ':'  ')+clean(action.label),'accent'),selected===index);
+          targets.push({y,x:left,end:left+cw,index});y++;
+        }
+        if(searchable)put(y++,color('Поиск: '+(query||'название или папка…'),'muted'));
+        const start=y,step=!compact&&height-start>=6?2:1,capacity=Math.max(1,Math.floor((height-start-2)/step));
+        const entryIndex=Math.max(0,selected-actions.length);
+        offset=Math.max(0,Math.min(offset,Math.max(0,entries.length-capacity)));
+        if(selected>=actions.length){if(entryIndex<offset)offset=entryIndex;if(entryIndex>=offset+capacity)offset=entryIndex-capacity+1;}
+        for(let i=offset;i<Math.min(entries.length,offset+capacity);i++){
+          const item=entries[i],index=list.indexOf(item),active=index===selected,row=start+(i-offset)*step;
+          put(row,(active?'› ':'  ')+clean(item.label)+(item.current?' · текущий':''),active);
+          if(step===2)put(row+1,color('  '+clean(item.description),'muted'),active);
+          for(let n=0;n<step;n++)targets.push({y:row+n,x:left,end:left+cw,index});
+        }
+        if(!entries.length)put(start,color(query?'Ничего не найдено':'Список пока пуст','muted'));
+        put(height-1,color('↑↓ выбор · Enter открыть · Esc закрыть'+(entries.length>capacity?` · ${Math.min(entryIndex+1,entries.length)}/${entries.length}`:''),'muted'));
+        return rows;
+      }
       if(panel && palette) {
         const p=palette, fg=(text,color=p.text)=>`\x1b[38;2;${color}m${text}\x1b[39m`;
         const paint=(text,w,bg=p.canvas)=>`\x1b[48;2;${bg}m`+fg(truncate(text,w,''))+' '.repeat(Math.max(0,w-measure(truncate(text,w,''))))+'\x1b[0m';
@@ -126,8 +167,8 @@ export function createMenu({ tui, theme, done, title, subtitle = "", items, stat
       else if (matchesKey(data, "up") || matchesKey(data, "shift+tab")) selected = (selected - 1 + list.length) % (list.length || 1);
       else if (matchesKey(data, "down") || matchesKey(data, "tab")) selected = (selected + 1) % (list.length || 1);
       else if (matchesKey(data, "enter")) { if (list[selected]) close(list[selected]); }
-      else if (searchable && matchesKey(data, "backspace")) { query = [...query].slice(0, -1).join(""); selected = offset = 0; }
-      else if (searchable && data && !/[\x00-\x1f\x7f-\x9f]/.test(data)) { query = (query + data).slice(0, 120); selected = offset = 0; }
+      else if (searchable && matchesKey(data, "backspace")) { query = [...query].slice(0, -1).join(""); offset=0;selected=layout==='list'&&query?filtered().filter(isAction).length:0; }
+      else if (searchable && data && !/[\x00-\x1f\x7f-\x9f]/.test(data)) { query = (query + data).slice(0, 120); offset=0;selected=layout==='list'?filtered().filter(isAction).length:0; }
       tui.requestRender();
     },
   };

@@ -9,8 +9,8 @@ export function validateProjectName(value){
 export function projectCatalog(sessions,registered=[],current){
  const groups=new Map();
  for(const p of registered)groups.set(folderKey(p.cwd),{...p,chats:[]});
- for(const session of sessions){if(!session.cwd)continue;const key=folderKey(session.cwd);if(!groups.has(key))groups.set(key,{name:basename(session.cwd)||session.cwd,cwd:session.cwd,chats:[]});groups.get(key).chats.push(session);}
- if(current&&!groups.has(folderKey(current)))groups.set(folderKey(current),{name:basename(current)||current,cwd:current,chats:[]});
+ // A launch directory or a historical chat is not an explicit project choice.
+ for(const session of sessions){if(!session.cwd)continue;groups.get(folderKey(session.cwd))?.chats.push(session);}
  for(const p of groups.values())p.chats.sort((a,b)=>+new Date(b.modified)-+new Date(a.modified));
  return [...groups.values()].sort((a,b)=>Number(folderKey(b.cwd)===folderKey(current||'.'))-Number(folderKey(a.cwd)===folderKey(current||'.'))||(+new Date(b.chats[0]?.modified||0)-+new Date(a.chats[0]?.modified||0))||a.name.localeCompare(b.name));
 }
