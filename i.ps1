@@ -18,7 +18,7 @@ function Install-Pi {
         $TaskInstaller = $null
         for ($TaskAttempt = 1; $TaskAttempt -le 3; $TaskAttempt++) {
             try {
-                $TaskInstaller = Invoke-RestMethod 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.9/installer/install-pi-windows.ps1' -TimeoutSec 30
+                $TaskInstaller = Invoke-RestMethod 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.10/installer/install-pi-windows.ps1' -TimeoutSec 30
                 break
             } catch {
                 if ($TaskAttempt -eq 3) { throw 'Could not download installer. Check your internet connection and retry.' }

@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/mai
 Откройте «Терминал» через Spotlight (⌘ Space) и вставьте:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.9/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
+curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.10/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
 ```
 
 На рабочем столе появится «AI своими руками» с иконкой молотка. Значок открывает pi в Терминале; проекты сохраняются в `~/Documents/AI DIY Projects`. Установка на существующий pi обновляет расширение и настройки. Создание macOS-приложения проверяется изолированным тестом, полноценный запуск требует Mac.
@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.
 Нажмите Win + R, вставьте команду и нажмите Enter. Она также работает в CMD и PowerShell:
 
 ```cmd
-powershell -NoP -NoExit -c "curl.exe -fsSL https://github.com/slavamirniy/pi-router-extension/raw/v1.0.9/i.ps1|Out-String|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
+powershell -NoP -NoExit -c "curl.exe -fsSL https://github.com/slavamirniy/pi-router-extension/raw/v1.0.10/i.ps1|Out-String|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
 ```
 
 Замените ключ и адрес API. Если итоговая строка длиннее 250 символов, вставляйте её в CMD или PowerShell. По умолчанию выбрана Kimi K3; необязательный третий аргумент задаёт другую модель. Команда работает в CMD и PowerShell. Бот подставляет значения автоматически; редкие значения со специальными символами оболочки передаёт через безопасную кодированную форму. Команда содержит ключ: не пересылайте её другим людям.
