@@ -51,18 +51,26 @@ export async function configure(options, dependencies={}) {
   if(!object(models)||!object(settings)||(models.providers!==undefined&&!object(models.providers))) throw new Error('Pi configuration must contain JSON objects');
   models.providers??={};
   const existing=models.providers[provider];
-  if(existing&&existing.baseUrl?.replace(/\/+$/,'')!==baseURL) throw new Error('This provider name belongs to another API. Choose a different PI_PROVIDER_NAME');
+  const addressChanged=!!existing&&existing.baseUrl?.replace(/\/+$/,'')!==baseURL;
+  // Never forward a saved credential to a new address implicitly. The install
+  // command supplies both values when replacing an existing connection.
+  if(addressChanged&&!options.apiKey?.trim()) throw new Error('Set PI_API_KEY when changing PI_BASE_URL');
   const key=options.apiKey?.trim() || existing?.apiKey;
   if(typeof key!=='string'||!key||/[\r\n\0]/.test(key)) throw new Error('Set PI_API_KEY to your client API key');
-  const template={...existing,api:'openai-completions',baseUrl:baseURL};
-  let discovered=Array.isArray(existing?.models)?existing.models:[],refreshed=false;
+  const connectionChanged=addressChanged||!!existing&&key!==existing.apiKey;
+  const template={...(connectionChanged?{}:existing),api:'openai-completions',baseUrl:baseURL};
+  // Per-model baseUrl, headers and compatibility options belong to the old
+  // connection too. Do not merge them into a different endpoint/key.
+  let discovered=!connectionChanged&&Array.isArray(existing?.models)?existing.models:[],refreshed=false;
   try { const catalog=await remoteModels(baseURL,key,dependencies.fetch??globalThis.fetch,dependencies.timeout??10000); discovered=mergeModels(discovered,catalog.data,template);refreshed=true; }
   catch { /* Offline installation keeps the previous list; startup can refresh later. */ }
   models.providers[provider]={...template,apiKey:key,models:discovered};
-  let selected=options.defaultModel || undefined;
-  if(selected&&!discovered.some(m=>m.id===selected)) throw new Error('PI_DEFAULT_MODEL is not present in the available catalogue');
+  let selected=discovered.some(m=>m.id===options.defaultModel)?options.defaultModel:undefined;
+  const preferredModelUnavailable=!!options.defaultModel&&!selected;
   selected??=settings.defaultProvider===provider&&discovered.some(m=>m.id===settings.defaultModel)?settings.defaultModel:discovered.find(m=>/^kimi[-_.]?k3$/i.test(m.id.split('/').at(-1)))?.id ?? discovered[0]?.id;
-  if(selected){settings.defaultProvider=provider;settings.defaultModel=selected;}
+  settings.defaultProvider=provider;
+  if(selected) settings.defaultModel=selected;
+  else delete settings.defaultModel;
   const contents=await Promise.all(extensionFiles.map(file=>fs.readFile(path.join(source,file))));
   const installFriendly=await prepareFriendly(settings,configDir);
   const stamp=`${Date.now()}.${process.pid}`,destination=path.join(configDir,'extensions','llmsrouter-progress');
@@ -72,7 +80,7 @@ export async function configure(options, dependencies={}) {
   for(let i=0;i<extensionFiles.length;i++) {const file=path.join(destination,extensionFiles[i]);await backup(file,stamp);await atomic(file,contents[i]);}
   await atomic(modelsFile,JSON.stringify(models,null,2)+'\n');
   await atomic(settingsFile,JSON.stringify(settings,null,2)+'\n');
-  return {provider,models:discovered.length,refreshed,defaultModel:selected,extensionInstalled:true,uiInstalled:true};
+  return {provider,baseURL,configDir,connectionChanged,models:discovered.length,refreshed,defaultModel:selected,preferredModelUnavailable,extensionInstalled:true,uiInstalled:true};
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
@@ -81,7 +89,9 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     const options=input.includes('\0')?Object.fromEntries(['apiKey','baseURL','provider','defaultModel','configDir'].map((k,i)=>[k,input.split('\0')[i]||undefined])):JSON.parse(input);
     const result=await configure(options);
     console.log(`Pi configured: ${result.provider}, ${result.models} models. UI and quota extensions installed.`);
-    if(!result.refreshed) console.warn('Model list could not be refreshed. Previous models retained; pi will try again on startup.');
+    console.log(`API address: ${result.baseURL}\nConfiguration: ${result.configDir}`);
+    if(!result.refreshed) console.warn(result.connectionChanged?'Connection updated. Model list unavailable; pi will try again on startup.':'Model list could not be refreshed. Previous models retained; pi will try again on startup.');
+    if(result.preferredModelUnavailable&&result.defaultModel) console.warn(`Preferred model unavailable. Selected: ${result.defaultModel}`);
     if(!result.models) console.warn('No models available yet. Check the API address/key and run /models-refresh in pi.');
   } catch(error) { console.error(`Installation stopped: ${error.message?.includes('PI_')||error.message?.includes('configuration')?error.message:'Could not configure pi; existing files were preserved where possible.'}`);process.exitCode=1; }
 }
