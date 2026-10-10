@@ -9,8 +9,24 @@ import { prepareFriendly } from './friendly.mjs';
 const source = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const extensionFiles = ['index.ts', 'models.mjs', 'progress.mjs', 'safety.mjs'];
 async function readJSON(file, fallback) {
-  try { return JSON.parse((await fs.readFile(file, 'utf8')).replace(/^\uFEFF/, '')); }
-  catch (error) { if (error.code === 'ENOENT') return fallback; throw new Error(`Invalid configuration: ${path.basename(file)}`); }
+  let raw;
+  try { raw=await fs.readFile(file); }
+  catch (error) {
+    if (error.code === 'ENOENT') return fallback;
+    throw new Error(`Cannot read configuration: ${file} (${error.code || 'read failed'})`);
+  }
+  const text=(raw[0]===0xff&&raw[1]===0xfe?new TextDecoder('utf-16le').decode(raw):raw[0]===0xfe&&raw[1]===0xff?new TextDecoder('utf-16be').decode(raw):raw.toString('utf8')).replace(/^\uFEFF/,'');
+  // Pi's ModelConfig accepts line comments and trailing commas. Preserve URLs
+  // and comment-like text inside strings while accepting the same syntax.
+  const normalized=text.replace(/"(?:\\.|[^"\\])*"|\/\/[^\n]*/g,m=>m[0]==='"'?m:'')
+    .replace(/"(?:\\.|[^"\\])*"|,(\s*[}\]])/g,(m,tail)=>tail??(m[0]==='"'?m:''));
+  if(!normalized.trim()) return fallback;
+  try { return JSON.parse(normalized); }
+  catch(error) {
+    // Parser messages may quote a credential. Report only numeric location.
+    const location=error.message.match(/(?:position \d+|line \d+ column \d+)/)?.[0];
+    throw new Error(`Invalid configuration: ${file} (invalid JSON${location?'; '+location:''}). Original file left unchanged.`);
+  }
 }
 function object(value) { return value && typeof value === 'object' && !Array.isArray(value); }
 async function atomic(file, content) {

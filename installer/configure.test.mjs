@@ -83,3 +83,29 @@ test('rotating key at same URL refreshes access and falls back when preferred mo
  const provider=JSON.parse(await fs.readFile(path.join(dir,'models.json'),'utf8')).providers.router;
  assert.equal(provider.apiKey,'new-key');assert.equal(provider.headers,undefined);assert.deepEqual(provider.models.map(m=>m.id),['qwen-plus']);
 });
+
+test('Pi JSON comments, trailing commas, empty files and UTF-16 are read without losing other providers',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'pi-jsonc-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const original='\uFEFF{\n// Pi accepts comments\n"providers":{"other":{"baseUrl":"https://other.example/v1","apiKey":"//literal,}","models":[],},},}\n';
+ const options={configDir:dir,baseURL:'https://new.example/v1',apiKey:'synthetic'};
+ const deps={fetch:async()=>new Response('{"data":[{"id":"kimi-k3"}]}')};
+ for(const encoding of ['utf8','utf16le']) {
+  await fs.writeFile(path.join(dir,'models.json'),original,encoding);
+  await fs.writeFile(path.join(dir,'settings.json'),'{"theme":"dark", // comment\n}');
+  await configure(options,deps);
+  const config=JSON.parse(await fs.readFile(path.join(dir,'models.json'),'utf8'));
+  assert.equal(config.providers.other.baseUrl,'https://other.example/v1');assert.equal(config.providers.other.apiKey,'//literal,}');
+  assert.equal(JSON.parse(await fs.readFile(path.join(dir,'settings.json'),'utf8')).theme,'dark');
+ }
+ await fs.writeFile(path.join(dir,'models.json'),'');
+ assert.equal((await configure(options,deps)).models,1);
+});
+
+test('malformed configuration is preserved and parser errors never reveal credentials',async t=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'pi-invalid-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const secret='DO_NOT_PRINT_THIS_SYNTHETIC_SECRET';await fs.writeFile(path.join(dir,'models.json'),secret);
+ await assert.rejects(configure({configDir:dir,baseURL:'https://api.example/v1',apiKey:'synthetic'}),error=>error.message.includes('invalid JSON')&&!error.message.includes(secret));
+ assert.equal(await fs.readFile(path.join(dir,'models.json'),'utf8'),secret);
+ await fs.rm(path.join(dir,'models.json'));await fs.mkdir(path.join(dir,'models.json'));
+ await assert.rejects(configure({configDir:dir,baseURL:'https://api.example/v1',apiKey:'synthetic'}),/Cannot read configuration/);
+});
