@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/mai
 Откройте «Терминал» через Spotlight (⌘ Space) и вставьте:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.7/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
+curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.8/installer/install-pi-macos.sh | env PI_API_KEY='KEY' PI_BASE_URL='https://YOUR_API/v1' PI_DEFAULT_MODEL='kimi-k3' bash
 ```
 
 На рабочем столе появится «AI своими руками» с иконкой молотка. Значок открывает pi в Терминале; проекты сохраняются в `~/Documents/AI DIY Projects`. Установка на существующий pi обновляет расширение и настройки. Создание macOS-приложения проверяется изолированным тестом, полноценный запуск требует Mac.
@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.
 Нажмите Win + R, вставьте команду и нажмите Enter. Она также работает в CMD и PowerShell:
 
 ```cmd
-powershell -NoProfile -c "irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.7/i.ps1|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
+powershell -NoProfile -c "irm https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.8/i.ps1|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
 ```
 
 Замените ключ и адрес API. Если итоговая строка длиннее 250 символов, вставляйте её в CMD или PowerShell. По умолчанию выбрана Kimi K3; необязательный третий аргумент задаёт другую модель. Команда работает в CMD и PowerShell. Бот подставляет значения автоматически; редкие значения со специальными символами оболочки передаёт через безопасную кодированную форму. Команда содержит ключ: не пересылайте её другим людям.
@@ -40,7 +40,9 @@ $env:PI_API_KEY='KEY'; $env:PI_BASE_URL='https://YOUR_API/v1'; irm https://raw.g
 
 Установщики ставят Node.js при необходимости, проверенную версию pi **0.84.4**, плагин квоты, интерфейс **Просто pi 0.8.2** и конфигурацию API. Плагин скачивается из закреплённого коммита; SHA-256 каждого файла проверяется до запуска. Установщики не отправляют API-ключ на GitHub и не передают его npm. Ключ сохраняется в личном `~/.pi/agent/models.json` для дальнейшей работы pi; файлы Unix имеют права 600. Предыдущие настройки сохраняются в резервные копии. Остальные провайдеры и настройки сохраняются.
 
-`PI_BASE_URL` обязателен и включает API-путь, например `/v1`. `PI_PROVIDER_NAME` — необязательное имя подключения (по умолчанию `router`); `PI_DEFAULT_MODEL` — необязательный ID из полученного каталога. `PI_CODING_AGENT_DIR` позволяет указать другую папку pi. Если имя подключения уже занято другим URL, установщик попросит выбрать новое имя.
+`PI_BASE_URL` обязателен и включает API-путь, например `/v1`. `PI_PROVIDER_NAME` — необязательное имя подключения (по умолчанию `router`); `PI_DEFAULT_MODEL` — предпочтительная модель из полученного каталога. Если её нет, выбирается доступная модель. `PI_CODING_AGENT_DIR` позволяет указать другую папку pi.
+
+Повторная команда установки заменяет адрес API и ключ указанного подключения, включая переход с localhost на сервер. Для смены адреса обязательно передать новый ключ явно. Каталог загружается заново; адреса и заголовки старых моделей не переносятся. Если новый API временно недоступен, адрес и ключ всё равно сохраняются, а модели загружаются при следующем запуске. После установки перезапустите уже открытые окна pi, чтобы они прочитали новые настройки.
 
 После установки pi запускается автоматически. `PI_NO_START=1` отключает запуск; `PI_SKIP_INSTALL=1` позволяет только обновить расширение и настройки, когда поддерживаемый pi уже установлен. В текущем pi используйте `/reload`.
 

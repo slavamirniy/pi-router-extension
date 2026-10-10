@@ -13,7 +13,7 @@ TASK_PROVIDER="${PI_PROVIDER_NAME:-router}"
 TASK_DEFAULT_MODEL="${PI_DEFAULT_MODEL:-}"
 TASK_CONFIG_DIR="${PI_CODING_AGENT_DIR:-}"
 unset PI_API_KEY PI_BASE_URL PI_PROVIDER_NAME PI_DEFAULT_MODEL
-TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/61896fc72b35e4ee01b0e7ac5824388f38169d51"
+TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/bc8698f83c66fcec7b6e520debb4ef284607ba5f"
 [[ -n "$TASK_BASE_URL" ]] || { echo 'Set PI_BASE_URL to your API address, including /v1.' >&2; exit 1; }
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -234,7 +234,7 @@ index.ts 96cf696860a00cddc2723ab9bdee323a3c6e6afdb801b62b5bfd21ac33019788
 models.mjs fe484ac7229d50a343ec06e810bca31eba722abdb84d5bb803d8267839ffbe8a
 progress.mjs 3590b43cb261209a4cc4eb36de959e6112802286e2750ee778380341b31e0dc0
 safety.mjs 76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba
-installer/configure.mjs 05baf93605429026e37a06b4ee35e1121100dc1877f191e87cbfcf9d14d529e9
+installer/configure.mjs 477644bc17aae032e5a7992463649430eeefc537fb22c5b8d9253f8d4e9b9cb7
 installer/friendly.mjs 5b3fd6778d5aec49aa27676c2409ebfe998a0e72c9c57c5eac2ee2eacd18f49e
 installer/pi-friendly/bundle.json 92ca6c017638545726b40a8776c4da00da44f6158b9b29adb778cdb37b394f6a
 installer/pi-friendly/activity.mjs 88e5d10d5f4058038744f5ed9787edc81bb2e0990288bfed172d4216f8d9fb8c
