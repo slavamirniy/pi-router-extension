@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.
 Нажмите Win + R, вставьте команду и нажмите Enter. Она также работает в CMD и PowerShell:
 
 ```cmd
-powershell -NoP -NoExit -c "[Net.ServicePointManager]::SecurityProtocol=3072;irm https://aipipego.com/i.ps1|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
+powershell -NoP -NoExit -c "curl.exe -fsSL https://github.com/slavamirniy/pi-router-extension/raw/v1.0.9/i.ps1|Out-String|iex;Install-Pi 'KEY' 'https://YOUR_API/v1'"
 ```
 
 Замените ключ и адрес API. Если итоговая строка длиннее 250 символов, вставляйте её в CMD или PowerShell. По умолчанию выбрана Kimi K3; необязательный третий аргумент задаёт другую модель. Команда работает в CMD и PowerShell. Бот подставляет значения автоматически; редкие значения со специальными символами оболочки передаёт через безопасную кодированную форму. Команда содержит ключ: не пересылайте её другим людям.
@@ -79,4 +79,4 @@ npm test
 
 Лицензия MIT.
 
-Windows-команда из бота скачивает публичные файлы с aipipego.com, включает TLS 1.2 до загрузки и оставляет окно открытым. Конфигурации с комментариями `//` и запятыми в конце поддерживаются, как в pi; повреждённые файлы не перезаписываются.
+Команды бота скачивают установщики и плагины из отдельного GitHub-репозитория. Windows использует curl.exe для первого HTTPS-скачивания и оставляет окно открытым. PI_BASE_URL задаёт адрес API отдельно от адреса установщика. Конфигурации с комментариями `//` и запятыми в конце поддерживаются, как в pi; повреждённые файлы не перезаписываются.
