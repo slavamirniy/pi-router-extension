@@ -30,22 +30,37 @@ export function installFriendly(pi, rendering) {
   pi.registerFlag("friendly-keep-footer", { description: "Сохранить footer другого расширения (без кликабельных slash-подсказок)", type: "boolean", default: false });
   const statuses = () => [...(footerData?.getExtensionStatuses().values() ?? [])].filter(Boolean);
   const modelLabel = ctx => clean(ctx.model?.name || ctx.model?.id || "Модель не выбрана");
-  const notifyError = (ctx, error) => { if (!stopped) ctx.ui.notify(`Не удалось выполнить действие: ${clean(error?.message ?? error)}`, "error"); };
-  const safe = (ctx, fn) => async () => { try { await fn(); } catch (error) { notifyError(ctx, error); } };
+  const notifyError = (ctx, error) => { if (!stopped) ctx.ui.notify(`Не удалось выполнить действие: ${clean(error?.message ?? error)}`, "warning"); };
+  const safe = (ctx, fn) => async () => { try { if(rendering.isWebActive?.())return;await fn(); } catch (error) { notifyError(ctx, error); } };
 
   async function choose(ctx, title, items, searchable = false, subtitle = "", form = false, bottom = false, layout = 'cards') {
     return ctx.ui.custom((tui, theme, _keys, done) => {
-      let lastFrame;
-      const finish=value=>{if((value?.navigation||value?.session||value?.id==='new'||value?.id==='current')&&lastFrame)workspace?.holdFrame(lastFrame);done(value);};
-      const inner = form ? createProjectForm({...rendering,tui,done:finish,palette:palettes[view.scheme]}) : createMenu({ ...rendering, tui, theme, done:finish, title, subtitle, items, searchable, bottom, layout, panel: Boolean(workspace), palette: rendering.makeEditor ? palettes[view.scheme] : undefined, statuses: () => [modelLabel(ctx), ...statuses()] });
-      activeMenu = !workspace ? inner : {
+      let lastFrame, inner, creating=false;
+      const finish=value=>{
+        if(!creating&&value?.id==='create'){
+          creating=true;
+          inner=createProjectForm({...rendering,tui,done:finish,palette:palettes[view.scheme]});
+          workspace?.clearHeldFrame();tui.requestRender();return;
+        }
+        if(creating){
+          if(typeof value==='string'&&value.trim()){done({id:'create',name:value});return;}
+          creating=false;inner=makeMenu();tui.requestRender();return;
+        }
+        if((value?.navigation||value?.session||value?.id==='new'||value?.id==='current')&&lastFrame)workspace?.holdFrame(lastFrame);
+        done(value);
+      };
+      const makeMenu=()=>form?createProjectForm({...rendering,tui,done:finish,palette:palettes[view.scheme]}):createMenu({...rendering,tui,theme,done:finish,title,subtitle,items,searchable,bottom,layout,panel:Boolean(workspace),palette:rendering.makeEditor?palettes[view.scheme]:undefined,statuses:()=>[modelLabel(ctx),...statuses()]});
+      inner=makeMenu();
+      activeMenu = {
         invalidate: () => inner.invalidate(), dispose: () => inner.dispose(),
         render(width) {
+          if(!workspace)return inner.render(width);
           const side=width>=100?26:18;
           const background=workspace.renderSurface(width), pane=inner.render(width-side);
           lastFrame=pane.map((row,i)=>rendering.truncate(background[i]||'',side,'')+row);workspace.clearHeldFrame();return lastFrame;
         },
         handleInput(data) {
+          if(!workspace){inner.handleInput(data);return;}
           const mouse=mouseEvent(data),side=tui.terminal.columns>=100?26:18;
           if(mouse && mouse.x<side){
             if(mouse.press&&mouse.button===0){
@@ -62,7 +77,7 @@ export function installFriendly(pi, rendering) {
     }, { overlay: true, overlayOptions: { width: "100%", maxHeight: "100%", row: 0, col: 0, margin: 0 } });
   }
   async function dialog(ctx, fn) {
-    if (ctx.mode !== "tui" || opened || stopped) return;
+    if (ctx.mode !== "tui" || opened || stopped || view.loading) return;
     opened = true;
     try { return await fn(); }
     finally { activeMenu?.dispose(); activeMenu = undefined; opened = false; }
@@ -82,7 +97,9 @@ export function installFriendly(pi, rendering) {
     const selected = await dialog(ctx, () => choose(ctx, "Выберите модель", models.map(model => ({ model, label: model.name || model.id, description: `${model.provider} / ${model.id}` })), true));
     if (selected && !await pi.setModel(selected.model)) ctx.ui.notify("Модель недоступна: проверьте подключение.", "warning");
   }
-  async function switchChat(ctx,path){
+  async function withLoading(label,fn){view.loading=label;workspace?.clearHeldFrame();workspace?.redraw();try{await new Promise(resolve=>setTimeout(resolve,20));return await fn();}finally{view.loading='';workspace?.redraw();}}
+  async function switchChat(ctx,path){return withLoading('Открываю разговор…',()=>performSwitchChat(ctx,path));}
+  async function performSwitchChat(ctx,path){
     const draft=pendingDraft??ctx.ui.getEditorText();pendingDraft=undefined;
     if(ctx.switchSession){
       try {
@@ -99,13 +116,15 @@ export function installFriendly(pi, rendering) {
   async function startChat(ctx,cwd){
     if(!ctx.isIdle()){ctx.ui.notify('Сначала остановите текущую работу.','info');return;}
     if(!projects){await command(ctx,'/new');return;}
-    await switchChat(ctx,projects.createChat(cwd));
+    const path=await withLoading('Создаю разговор…',async()=>projects.createChat(cwd));
+    await switchChat(ctx,path);
   }
-  async function createProject(ctx,onBack){
-    const name=await dialog(ctx,()=>choose(ctx,'Новый проект',[],false,'',true));
+  async function createProject(ctx,onBack,providedName){
+    const name=providedName??await dialog(ctx,()=>choose(ctx,'Новый проект',[],false,'',true));
     if(name?.back){await onBack?.();return;}
     if(!name?.trim())return;
-    const project=projects.create(name);await startChat(ctx,project.cwd);
+    try{const project=await withLoading('Создаю проект…',async()=>projects.create(name));await startChat(ctx,project.cwd);}
+    finally{workspace?.clearHeldFrame();workspace?.redraw();}
   }
   async function newConversation(ctx){
     if(!ctx.isIdle()){ctx.ui.notify('Сначала остановите текущую работу.','info');return;}
@@ -117,28 +136,28 @@ export function installFriendly(pi, rendering) {
       {id:'projects',label:'Выбрать проект',description:'Открыть существующий проект и его чаты'},
     ],false,current?'Чаты и файлы сохранятся. Черновик — в новый чат.':'Каждый проект — отдельная папка. Ваш текст сохранён.',false,true));
     if(choice?.id==='current')await startChat(ctx,currentFolder(ctx));
-    if(choice?.id==='create')await createProject(ctx,()=>newConversation(ctx));
+    if(choice?.id==='create')await createProject(ctx,()=>newConversation(ctx),choice.name);
     if(choice?.id==='projects')await history(ctx);
   }
   async function history(ctx){
     if(!ctx.isIdle()){ctx.ui.notify('Сначала остановите текущую работу.','info');return;}
     const choice=await dialog(ctx,async()=>{
-      const sessions=await rendering.listSessions();
+      const sessions=await withLoading('Загружаю проекты и разговоры…',()=>rendering.listSessions());
       if(!projects){return choose(ctx,'История разговоров',sessions.map(session=>({session,label:session.name||clean(session.firstMessage)||'Без названия',description:session.cwd})),true);}
       const registered=projects.list();
-      const catalog=projectCatalog(sessions,registered,currentFolder(ctx));
+      let catalog=projectCatalog(sessions,registered,currentFolder(ctx));
       const keys=new Set(registered.map(p=>folderKey(p.cwd)));
       const other=sessions.filter(s=>!s.cwd||!keys.has(folderKey(s.cwd)));
       let project;
       while(!stopped){
         if(!project){
+          catalog=projectCatalog(sessions,projects.list(),currentFolder(ctx));
           const picked=await choose(ctx,'Проекты',[
-            {id:'create',navigation:true,kind:'primary',label:'+ Новый проект'},
-            {id:'attach',navigation:true,kind:'action',label:'+ Добавить папку'},
-            ...(other.length?[{id:'other',navigation:true,kind:'action',label:'Другие разговоры · '+other.length}]:[]),
+            {id:'create',navigation:true,kind:'primary',toolbar:true,label:'Создать проект'},
             ...catalog.map(p=>({project:p,navigation:true,label:p.name,description:p.chats.length+' чатов · '+p.cwd,current:folderKey(p.cwd)===folderKey(currentFolder(ctx))})),
-          ],true,catalog.length?'Выберите проект, чтобы открыть его чаты':'Создайте проект или добавьте свою папку',false,false,'list');
-          if(!picked||picked.id==='create'||picked.id==='attach')return picked;
+            ...(other.length?[{id:'other',navigation:true,label:'Другие разговоры · '+other.length}]:[]),
+          ],true,catalog.length?'Выберите проект, чтобы открыть его чаты':'Создайте первый проект',false,false,'list');
+          if(!picked||picked.id==='create')return picked;
           if(picked.id==='other'){
             const old=await choose(ctx,'Другие разговоры',[
               {id:'back',navigation:true,kind:'back',label:'← Все проекты'},
@@ -147,23 +166,19 @@ export function installFriendly(pi, rendering) {
             if(old?.id==='back')continue;
             return old;
           }
-          project=picked.project;
+          project=picked.project;projects.markOpened?.(project.cwd);
         }
         const name=project.name;
         const picked=await choose(ctx,name,[
           {id:'back',navigation:true,kind:'back',label:'← Все проекты',description:'Выбрать другой проект'},
-          ...((projects.isProject?.(project.cwd)??!projects.isHub(project.cwd))?[{id:'new',kind:'primary',project,label:'+ Новый чат',description:'Начать разговор в этом проекте'}]:[]),
+          ...((projects.isProject?.(project.cwd)??!projects.isHub(project.cwd))?[{id:'new',kind:'primary',toolbar:true,project,label:'+ Новый чат',description:'Начать разговор в этом проекте'}]:[]),
           ...project.chats.map(session=>({session,label:session.name||(session.messageCount?clean(session.firstMessage).slice(0,80):'Новый разговор'),description:new Date(session.modified).toLocaleDateString('ru-RU')+' · сообщений: '+(session.messageCount??0)})),
         ],true,project.chats.length?'Выберите чат':'Чатов пока нет — создайте первый',false,false,'list');
         if(picked?.id==='back'){project=undefined;continue;}
         return picked;
       }
     });
-    if(choice?.id==='create')await createProject(ctx,()=>history(ctx));
-    else if(choice?.id==='attach'){
-      const folder=await ctx.ui.input('Добавить папку','Полный путь к папке проекта');
-      if(folder?.trim()){projects.attach(folder);await history(ctx);}
-    }
+    if(choice?.id==='create')await createProject(ctx,()=>history(ctx),choice.name);
     else if(choice?.session)await switchChat(ctx,choice.session.path);
     else if(choice?.id==='new')await startChat(ctx,choice.project.cwd);
   }
@@ -190,9 +205,11 @@ export function installFriendly(pi, rendering) {
   async function more(ctx) {
     const item = await dialog(ctx, () => choose(ctx, "Действия", [
       {label: "Модель", id:"model"}, {label:"История",id:"history"},
+      ...(rendering.openWeb?[{label:"Открыть в браузере",id:"web"}]:[]),
       {label:"Сменить тему",id:"theme"}, {label:"Меню",id:"menu"},
     ], true));
     if(item?.id === "model") await selectModel(ctx);
+    if(item?.id === "web") await rendering.openWeb?.(ctx,voice,statuses);
     if(item?.id === "history") await command(ctx,"/friendly history");
     if(item?.id === "menu") await menu(ctx);
     if(item?.id === "theme") changeTheme(ctx);
@@ -205,16 +222,19 @@ export function installFriendly(pi, rendering) {
   async function menu(ctx) {
     const active = Boolean(ctx.ui.getEditorText().trim() || ctx.sessionManager?.getEntries().some(entry => entry.type === "message"));
     const action = await dialog(ctx, () => choose(ctx, "Просто pi", [
+      { id: "web", label: "Открыть веб-интерфейс", description: "Более удобный и наглядный интерфейс в браузере" },
       { id: "new", label: "Новый разговор", description: "Начать с чистого листа" },
       { id: "history", label: "Проекты и чаты", description: "Открыть проект или любой разговор" },
       ...(active ? [{ id: "chat", label: "Продолжить разговор", description: "Вернуться к текущей задаче" }] : []),
     ], false, "С чего начнём?"));
+    if(action?.id === "web")await rendering.openWeb?.(ctx,voice,statuses);
     if (action?.id === "new") await newConversation(ctx);
     if (action?.id === "history") await command(ctx, "/friendly history");
   }
-  pi.registerCommand("friendly", { description: "Новый разговор и история по проектам", handler: async (args, ctx) => safe(ctx, () => args.startsWith("open ") ? switchChat(ctx,decodeURIComponent(args.slice(5))) : args.trim()==="new" ? newConversation(ctx) : args.trim() === "history" ? history(ctx) : args.trim() === "commands" ? commands(ctx) : menu(ctx))() });
+  pi.registerCommand("friendly", { description: "Новый разговор и история по проектам", handler: async (args, ctx) => safe(ctx, () => args.startsWith("open ") ? switchChat(ctx,decodeURIComponent(args.slice(5))) : args.trim()==="web" ? rendering.openWeb?.(ctx,voice,statuses) : args.trim()==="new" ? newConversation(ctx) : args.trim() === "history" ? history(ctx) : args.trim() === "commands" ? commands(ctx) : menu(ctx))() });
   pi.registerShortcut("f2", { description: "Открыть меню Просто pi", handler: ctx => safe(ctx, () => menu(ctx))() });
   pi.on("input",(event,ctx)=>{
+    if(ctx.mode==='tui'&&event.source!=='extension'&&rendering.isWebActive?.())return {action:'handled'};
     if(ctx.mode!=="tui"||hasProject(ctx))return;
     ctx.ui.setEditorText(event.text);
     clearTimeout(startupTimer);
@@ -265,10 +285,10 @@ export function installFriendly(pi, rendering) {
         workspace?.dispose();
         const delegate = previousFactory ? previousFactory(tui, editorTheme, keys) : rendering.makeEditor(tui, editorTheme, keys);
         workspace = createWorkspace({ delegate, tui, theme: ctx.ui.theme, rendering, ctx,
-          cleanView: true, viewState: () => ({...view, paneOpen:opened, projectName:hasProject(ctx)?projects?.name(currentFolder(ctx)):undefined, needsProject:!hasProject(ctx), widgets:[...widgets.values()], statuses:statuses()}),
+          cleanView: true, viewState: () => ({...view, webActive:rendering.isWebActive?.(), paneOpen:opened, projectName:hasProject(ctx)?projects?.name(currentFolder(ctx)):undefined, needsProject:!hasProject(ctx), widgets:[...widgets.values()], statuses:statuses()}),
           footerHeight: () => footerRows, slashEnabled: !pi.getFlag("friendly-keep-footer"),
           actions: {
-            newChat: safe(ctx, () => newConversation(ctx)), history: safe(ctx, () => history(ctx)),
+            web: safe(ctx,()=>rendering.openWeb?.(ctx,voice,statuses)), newChat: safe(ctx, () => newConversation(ctx)), history: safe(ctx, () => history(ctx)),
             theme: safe(ctx, () => changeTheme(ctx)), more: safe(ctx, () => more(ctx)),
             menu: safe(ctx, () => menu(ctx)), model: safe(ctx, () => selectModel(ctx)),
             commands: safe(ctx, () => commands(ctx)),
@@ -297,7 +317,8 @@ export function installFriendly(pi, rendering) {
     workspace?.redraw();
   });
   pi.on("agent_start",()=>{view.error=undefined;view.live=undefined;view.notice="";view.steps=[];view.running=true;view.started=Date.now();view.activity="Помощник готовит ответ…";workspace?.redraw();});
-  pi.on("agent_end",()=>{view.activity="";view.running=false;workspace?.redraw();});
+  pi.on("agent_end",()=>{view.activity="";workspace?.redraw();});
+  pi.on('agent_settled',(_event,ctx)=>{view.running=false;const last=ctx.sessionManager?.getBranch?.().filter(e=>e.type==='message'&&e.message.role==='assistant').at(-1)?.message||view.live;view.error=last?.errorMessage?{raw:clean(last.errorMessage)}:undefined;workspace?.redraw();});
   pi.on("tool_execution_start",event=>{view.steps=startActivity(view.steps??[],event);view.activity="Выполняю задачу…";workspace?.redraw();});
   pi.on("tool_execution_end",event=>{view.steps=finishActivity(view.steps??[],event);if(event.isError)view.error={kind:"tool",raw:clean(event.result?.content?.filter(c=>c.type==="text").map(c=>c.text).join("\n")||"Инструмент завершился с ошибкой")};workspace?.redraw();});
   pi.on("session_shutdown", event => {

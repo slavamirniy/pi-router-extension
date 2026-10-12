@@ -5,8 +5,7 @@ export function centered(text,width,truncate,measure){
  return ' '.repeat(left)+value+' '.repeat(gap-left);
 }
 export function buttonRows(label,width,truncate,measure){
- const inner=Math.max(0,width-2);
- return ['╭'+'─'.repeat(inner)+'╮','│'+centered(label,inner,truncate,measure)+'│','╰'+'─'.repeat(inner)+'╯'];
+ return [' '.repeat(width),centered(label,width,truncate,measure),' '.repeat(width)];
 }
 
 export function navigationRows(width,p,truncate,measure){

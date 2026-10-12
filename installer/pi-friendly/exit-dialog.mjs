@@ -1,3 +1,4 @@
+import {hoverRows} from './hover.mjs';
 import {buttonRows,centered} from './buttons.mjs';
 import {mouseEvent} from './menu.mjs';
 import {acquireMouse} from './mouse.mjs';
@@ -5,8 +6,8 @@ export async function requestExit(ctx,confirm){
  if(!ctx.isIdle())return;
  if(await confirm() && ctx.isIdle())ctx.shutdown();
 }
-export function createExitDialog({tui,done,palette:p,truncate,measure,matchesKey,background}){
- let focus=1,targets=[],size='',disposed=false;
+export function createExitDialog({tui,done,palette:p,truncate,measure,matchesKey,background,sliceByColumn}){
+ let pointer;let focus=1,targets=[],size='',disposed=false;
  const release=acquireMouse(tui.terminal);
  const close=value=>{if(disposed)return;disposed=true;release();done(value);};
  return {invalidate(){},dispose(){if(!disposed){disposed=true;release();}},render(width){
@@ -31,10 +32,10 @@ export function createExitDialog({tui,done,palette:p,truncate,measure,matchesKey
    }
    targets.push({x:bx,y,w:bw,h:3,value:i===0});
   });
-  return rows;
+  return hoverRows(rows,targets,pointer,sliceByColumn,measure);
  },handleInput(data){
   if(disposed)return;const mouse=mouseEvent(data);
-  if(mouse){if(size!==`${tui.terminal.columns}:${tui.terminal.rows}`){tui.requestRender();return;}if(mouse.press&&mouse.button===0){const hit=targets.find(t=>mouse.x>=t.x&&mouse.x<t.x+t.w&&mouse.y>=t.y&&mouse.y<t.y+t.h);if(hit)close(hit.value);}}
+  if(mouse){if(mouse.button===35){pointer=mouse;tui.requestRender();return;}if(size!==`${tui.terminal.columns}:${tui.terminal.rows}`){tui.requestRender();return;}if(mouse.press&&mouse.button===0){const hit=targets.find(t=>mouse.x>=t.x&&mouse.x<t.x+t.w&&mouse.y>=t.y&&mouse.y<t.y+t.h);if(hit)close(hit.value);}}
   else if(matchesKey(data,'escape'))close(false);
   else if(['tab','shift+tab','left','right'].some(key=>matchesKey(data,key)))focus=1-focus;
   else if(matchesKey(data,'enter'))close(focus===0);

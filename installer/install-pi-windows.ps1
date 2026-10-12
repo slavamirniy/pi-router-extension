@@ -223,27 +223,40 @@ $TaskManifest = @{
     'progress.mjs' = '3590b43cb261209a4cc4eb36de959e6112802286e2750ee778380341b31e0dc0'
     'safety.mjs' = '76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba'
     'installer/configure.mjs' = 'be10058cd2fbe5634ec69d0099edb9587758c0b05d58261818635cf5b6f42d61'
-    'installer/friendly.mjs' = '5b3fd6778d5aec49aa27676c2409ebfe998a0e72c9c57c5eac2ee2eacd18f49e'
-    'installer/pi-friendly/bundle.json' = '84ce0b5648ff70619cc8c97e4f143b68dc9bd3286cb782d3ed11d589710285d3'
+    'installer/friendly.mjs' = '85a7972af7c1bf9ac4dbec6efd31f1d888a3c0da9044cc186d1aa8fed669750d'
+    'installer/pi-friendly/bundle.json' = '675d83529ebed23b60e84cb6e4a336571a0e592fa9be2ca4fa800d24db5776b9'
     'installer/pi-friendly/activity.mjs' = '88e5d10d5f4058038744f5ed9787edc81bb2e0990288bfed172d4216f8d9fb8c'
-    'installer/pi-friendly/buttons.mjs' = '870d02159a8d3fa90f400276459bae9cfeb91b443b10b6322358dcb53223ae46'
+    'installer/pi-friendly/buttons.mjs' = '3296455c173d266e8af49d542780a5c23afc8935d37b88380a82d0ecfecc67df'
+    'installer/pi-friendly/clipboard.mjs' = 'fe40cdf182c2ca91e7513f2782dbb0e7e69bc989b0c3671260fe63bc9bd2b719'
     'installer/pi-friendly/errors.mjs' = '567914532d7fc26c9203fec036a87419f70b039e1b6e6e65e06edcdb0bf2c327'
-    'installer/pi-friendly/exit-dialog.mjs' = 'e85803f9c57bd95c8b9f8040da386cc53ee3ded41decead873464cfd2601e01c'
-    'installer/pi-friendly/friendly.mjs' = 'da2d9f47ea1d42da1d371abc6f2e0893f49500f7ac1d9091fb04fbbe038580ff'
-    'installer/pi-friendly/index.ts' = 'cbb2eddb3f8b7e723a17f7b66cf9f7c780e10ddac75bdf78c17df728fd294e51'
+    'installer/pi-friendly/exit-dialog.mjs' = '1d4fa0b3cd9b32b9d3b3825028e0202d53b91f39a57bd4876965317020605971'
+    'installer/pi-friendly/folder-picker.mjs' = 'a992b884a104e02ea2c59fa1eece028f1d57b008e2a0bf8dca6e58a10d96e4e5'
+    'installer/pi-friendly/friendly.mjs' = 'e2d9b08f20ae920b694269acd85c45510fe236ff05cbf8b5c1657ad3a2309b61'
+    'installer/pi-friendly/hover.mjs' = 'b5cc892ce3a02282e20803a358759a785e8b024a6927c207eefacefafbc91f1d'
+    'installer/pi-friendly/index.ts' = '8cd979f656bd8ed0772344088b25bdefbc1efa500999987b804cf9d5e2c26a5b'
     'installer/pi-friendly/LICENSE' = '94a5c5d74147e19c336747bda0baa9c923363cb3fac320f95743cba72a59d186'
-    'installer/pi-friendly/menu.mjs' = 'a02a9cc7284b374864e8abb0dc1722cacb8625db23b6fb990ceb856d8303c6b9'
-    'installer/pi-friendly/mouse.mjs' = '89a96d8efb03719f430c81d4ae4e2c3a71c25cc17d616f917b84c1c1ca1b7316'
-    'installer/pi-friendly/package.json' = '9dcb7d822d6a8d8af4d91e1c58f113dc081e0fe8f6933c85a76a34bb20fac3f5'
-    'installer/pi-friendly/project-form.mjs' = '99ab58e81df761612baf5860f93eb358873f435a71419cb27ef8998d7787aa2e'
-    'installer/pi-friendly/projects.mjs' = '7b531609e2b07ab78ff042d2d64ab000efd4b62f1ecd06d860253de730cae5ba'
-    'installer/pi-friendly/README.md' = 'f3c8235c20ab30f549ef12cd1ae0af166e987983feef049e393dff47873d2300'
-    'installer/pi-friendly/surface.mjs' = '5c9f4c9f5ad6189ae462ccd6fbbe0d6e158f9b62e17cd5420bd005a6ea616df7'
-    'installer/pi-friendly/voice_audio.py' = '659fdd63d58e4d6721ef64aba76ce91994e2704f8c7a0d73bfcc2bfecd762da6'
+    'installer/pi-friendly/menu.mjs' = 'a4e82e05c988c4d3635c4a3e0ef8aef3344e17c04d19f1c23f8edca1eb7bbad3'
+    'installer/pi-friendly/model-preference.mjs' = '6e1376482dcd1893a8ad808f295e451bd49aca5df5ef75d285d1be168f0c132c'
+    'installer/pi-friendly/mouse.mjs' = '6cafdb25d417a4ff3056e0a12c3b83750f7378bb290dd88e29ebaec86447d43f'
+    'installer/pi-friendly/package.json' = '05e7ded88ec4b722ec026b4c75967cd26aa40b5000510a8093f6fad39afa454c'
+    'installer/pi-friendly/project-form.mjs' = '9dc9c41756ad2d1b8f3912e493fc89e84242e9a39e63dec99339b2fc6d41acaf'
+    'installer/pi-friendly/projects.mjs' = '60104d3681188fb5e04cab39d0a5e7478d75c91c4f01b55d4f05c2918392d717'
+    'installer/pi-friendly/README.md' = 'bbc15f165120576b1e7f92ecc102570a1e7d1ee4a937c6fb285e10bf79d85fb9'
+    'installer/pi-friendly/selection.mjs' = '7c6fe45e6afa0c4abd996352ae5a217e4fe9205efb097e0e2c8e2cea805110ca'
+    'installer/pi-friendly/surface.mjs' = 'fcacd29a3859927367f887aa6c3784adb949c81f5f00c8638f812f3c9ce47951'
+    'installer/pi-friendly/uploads.mjs' = '618b6823070e88c842fe6269f662e46e2bf16a61200ccfd32c9cb9bfd92a36c2'
     'installer/pi-friendly/voice-setup.mjs' = 'c545311ab52c4e1a09cf02662d6c2ae52e8561c0ad05fb6e96f87d83f32b988f'
+    'installer/pi-friendly/voice.mjs' = 'eaf585368e2148fc2f36ff066f0b2d809a5224c0f323080712e45554b1f17bea'
+    'installer/pi-friendly/voice_audio.py' = '659fdd63d58e4d6721ef64aba76ce91994e2704f8c7a0d73bfcc2bfecd762da6'
+    'installer/pi-friendly/web/app.css' = '8006d53348d4c0a46b9bda22d9ee9c7644142951e1aaa8aedecccb14fc36b4ed'
+    'installer/pi-friendly/web/app.js' = '30c087b459e0adec05ead8c9d317a67cb6a3e69fb20b56278995ee61585648f0'
+    'installer/pi-friendly/web/index.html' = '4fdf949e51979357da980422bbaff37e418f29c317fbce603f013e498a358996'
+    'installer/pi-friendly/web-host.mjs' = '3ea88db6f0ee9d65271d3060b1ac51b2d182b0502f4ae21092a1a6533376f5d5'
+    'installer/pi-friendly/web-messages.mjs' = '10100e73c844cdcc750a7d0383424aeafb9f2a0dabc635b7e1839c50001b251d'
+    'installer/pi-friendly/web-rpc.mjs' = '30c726753bec0cd74607cbd3251d8e7bfa981ba30ca237097477251b5760c792'
+    'installer/pi-friendly/web-server.mjs' = '66c492ecb7a67e24b562507b9fb707d426638dd3cfdadcfd1c54b57c588239c7'
+    'installer/pi-friendly/workspace.mjs' = '59d10621f26b7e9ac9f90073f686c5e4a9d084bd103afd8978eb6d19c7d4c568'
     'installer/pi-friendly/voice-worker.py' = '5e0119a3b732a70ca4019f9dea5c20802892d9b4f3af83750f096c457d94d55d'
-    'installer/pi-friendly/voice.mjs' = '17cce904c157c2bcb1cf162a66c3c70fded45cf63a8328d6a6e0ddca5f28eb60'
-    'installer/pi-friendly/workspace.mjs' = '4633ac096a57d37709de536ad37f1b5fad36381feccd74db64e40d0a7a31ae03'
 }
 try {
     foreach ($TaskFile in $TaskManifest.Keys) {
@@ -286,12 +299,12 @@ function Install-DesktopShortcut {
     # cmd reads the system code page; generated paths may contain Cyrillic.
     [IO.File]::WriteAllText($taskLauncher, "@chcp 65001 >nul`r`n" + $taskLaunchText, [Text.UTF8Encoding]::new($false))
     $taskShell = New-Object -ComObject WScript.Shell
-    $taskLink = $taskShell.CreateShortcut((Join-Path $taskDesktop 'AI своими руками.lnk'))
+    $taskLink = $taskShell.CreateShortcut((Join-Path $taskDesktop 'AI СЃРІРѕРёРјРё СЂСѓРєР°РјРё.lnk'))
     $taskLink.TargetPath = $env:ComSpec
     $taskLink.Arguments = '/d /c ""' + $taskLauncher + '""'
     $taskLink.WorkingDirectory = $taskProjects
     $taskLink.IconLocation = $taskIcon + ',0'
-    $taskLink.Description = 'AI своими руками'
+    $taskLink.Description = 'AI СЃРІРѕРёРјРё СЂСѓРєР°РјРё'
     $taskLink.Save()
     Write-Ok 'Desktop shortcut created. Projects: Documents/AI DIY Projects'
 }

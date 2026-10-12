@@ -1,3 +1,4 @@
+import {hoverRows} from './hover.mjs';
 import {centered,navigationRows,buttonRows} from './buttons.mjs';
 import { acquireMouse } from "./mouse.mjs";
 // A full-width, top-left overlay: mouse coordinates never depend on chat scrollback.
@@ -11,8 +12,9 @@ export function mouseEvent(data) {
   return m ? { button: Number(m[1]), x: Number(m[2]) - 1, y: Number(m[3]) - 1, press: m[4] === "M" } : undefined;
 }
 
-export function createMenu({ tui, theme, done, title, subtitle = "", items, statuses = () => [], searchable = false, truncate, measure, matchesKey, palette, panel = false, bottom = false, layout = 'cards' }) {
-  let query = "", selected = 0, offset = 0, targets = [], dimensions = "", disposed = false;
+export function createMenu({ tui, theme, done, title, subtitle = "", items, statuses = () => [], searchable = false, truncate, measure, matchesKey, palette, panel = false, bottom = false, layout = 'cards', sliceByColumn }) {
+  let pointer;
+  let searchOpen=layout!=="list", query = "", selected = 0, offset = 0, targets = [], dimensions = "", disposed = false;
   const terminal = tui.terminal;
   // Save and restore terminal mouse modes; only capture mouse while this dialog is open.
   const releaseMouse = acquireMouse(terminal);
@@ -38,7 +40,7 @@ export function createMenu({ tui, theme, done, title, subtitle = "", items, stat
         const paint=(text,w,selected=false)=>{
           const fitted=truncate(text,w,'');
           const row=fitted+' '.repeat(Math.max(0,w-measure(fitted)));
-          return p?`\x1b[48;2;${selected?p.selection||p.bubble:p.canvas}m`+fg(row,p.text)+'\x1b[0m':row;
+          return p?`\x1b[48;2;${selected===true?p.selection||p.bubble:selected==='card'?p.sidebar:p.canvas}m`+fg(row,p.text)+'\x1b[0m':row;
         };
         const cw=Math.min(80,width-4),left=Math.floor((width-cw)/2),rows=Array(height).fill(paint('',width));
         const put=(y,text,selected=false)=>{if(y>=0&&y<height)rows[y]=paint('',left)+paint(text,cw,selected)+paint('',width-left-cw);};
@@ -53,25 +55,37 @@ export function createMenu({ tui, theme, done, title, subtitle = "", items, stat
         const compact=height<16;
         if(!compact)put(3,color(clean(subtitle),'muted'));
         let y=compact?2:5;
-        for(const action of actions){
+        for(const action of actions.filter(item=>!item.toolbar)){
           const index=list.indexOf(action);
           put(y,color((selected===index?'› ':'  ')+clean(action.label),'accent'),selected===index);
-          targets.push({y,x:left,end:left+cw,index});y++;
+          targets.push({y,x:left,end:left+cw,index});y+=compact?1:2;
         }
-        if(searchable)put(y++,color('Поиск: '+(query||'название или папка…'),'muted'));
-        const start=y,step=!compact&&height-start>=6?2:1,capacity=Math.max(1,Math.floor((height-start-2)/step));
+        const toolbar=actions.find(item=>item.toolbar);
+        if(toolbar||searchable){
+          const bh=compact?1:3,sw=searchable?(compact?2:6):0,bw=toolbar?Math.min(22,cw-sw):0,bx=left+cw-sw-bw,index=toolbar?list.indexOf(toolbar):-1;
+          for(let n=0;n<bh;n++){
+            const mid=n===Math.floor(bh/2),glass=mid?centered('🔍',sw,truncate,measure):' '.repeat(sw),label=mid&&toolbar?centered(clean(toolbar.label),bw,truncate,measure):' '.repeat(bw);
+            rows[y+n]=paint('',bx)+paint(glass,sw,searchOpen?true:'card')+paint(label,bw,index===selected?true:'card')+paint('',width-bx-sw-bw);
+          }
+          if(searchable)targets.push({y,x:bx,end:bx+sw,index:-3,h:bh});
+          if(toolbar)for(let n=0;n<bh;n++)targets.push({y:y+n,x:bx+sw,end:bx+sw+bw,index});
+          if(searchable)for(let n=1;n<bh;n++)targets.push({y:y+n,x:bx,end:bx+sw,index:-3});
+          y+=bh;
+          if(searchOpen&&searchable)put(y++,color('Поиск: '+(query||'начните печатать…'),'muted'));
+        }
+        const start=y+(compact?0:1),step=!compact&&height-y>=6?3:1,capacity=Math.max(1,Math.floor((height-start-2)/step));
         const entryIndex=Math.max(0,selected-actions.length);
         offset=Math.max(0,Math.min(offset,Math.max(0,entries.length-capacity)));
         if(selected>=actions.length){if(entryIndex<offset)offset=entryIndex;if(entryIndex>=offset+capacity)offset=entryIndex-capacity+1;}
         for(let i=offset;i<Math.min(entries.length,offset+capacity);i++){
           const item=entries[i],index=list.indexOf(item),active=index===selected,row=start+(i-offset)*step;
-          put(row,(active?'› ':'  ')+clean(item.label)+(item.current?' · текущий':''),active);
-          if(step===2)put(row+1,color('  '+clean(item.description),'muted'),active);
-          for(let n=0;n<step;n++)targets.push({y:row+n,x:left,end:left+cw,index});
+          put(row,(active?' › ':'   ')+clean(item.label)+(item.current?' · текущий':'')+'  ›',active||'card');
+          if(step===3)put(row+1,color('   '+clean(item.description),'muted'),active||'card');
+          for(let n=0;n<(step===3?2:1);n++)targets.push({y:row+n,x:left,end:left+cw,index});
         }
         if(!entries.length)put(start,color(query?'Ничего не найдено':'Список пока пуст','muted'));
-        put(height-1,color('↑↓ выбор · Enter открыть · Esc закрыть'+(entries.length>capacity?` · ${Math.min(entryIndex+1,entries.length)}/${entries.length}`:''),'muted'));
-        return rows;
+        put(height-1,color('↑↓ выбор · Enter открыть · Ctrl+F поиск · Esc закрыть'+(entries.length>capacity?` · ${Math.min(entryIndex+1,entries.length)}/${entries.length}`:''),'muted'));
+        return hoverRows(rows,targets,pointer,sliceByColumn,measure);
       }
       if(panel && palette) {
         const p=palette, fg=(text,color=p.text)=>`\x1b[38;2;${color}m${text}\x1b[39m`;
@@ -100,16 +114,16 @@ export function createMenu({ tui, theme, done, title, subtitle = "", items, stat
           const primary=item.kind==='primary',bg=primary?p.accent:i===selected?(p.selection||p.bubble):item.kind==='back'?p.button:p.sidebar;
           const color=primary?p.onAccent:p.text;
           if(step===5){
-            put(y,fg('╭'+'─'.repeat(cw-2)+'╮',color),bg);
+            put(y,fg('┌'+'─'.repeat(cw-2)+'┐',color),bg);
             put(y+1,fg('│'+centered(clean(item.label),cw-2,truncate,measure)+'│',color),bg);
             put(y+2,fg('│'+centered(clean(item.description||'Нажмите, чтобы выбрать'),cw-2,truncate,measure)+'│',primary?p.onAccent:p.muted),bg);
-            put(y+3,fg('╰'+'─'.repeat(cw-2)+'╯',color),bg);
+            put(y+3,fg('└'+'─'.repeat(cw-2)+'┘',color),bg);
           }else put(y,fg(centered(clean(item.label),cw,truncate,measure),color),bg);
           for(let n=0;n<(step===5?4:1);n++)targets.push({y:y+n,x:left,end:left+cw,index:i});
         }
         if(!list.length)put(8,'Ничего не найдено');
-        put(height-2,fg('↑↓ выбор · Enter открыть · Esc закрыть'+(list.length>capacity?` · ${selected+1}/${list.length}`:''),p.muted));
-        return rows;
+        put(height-2,fg('↑↓ выбор · Enter открыть · Ctrl+F поиск · Esc закрыть'+(list.length>capacity?` · ${selected+1}/${list.length}`:''),p.muted));
+        return hoverRows(rows,targets,pointer,sliceByColumn,measure);
       }
       const contentWidth = Math.min(width - 4, searchable ? 76 : 48);
       const left = Math.max(2, Math.floor((width - contentWidth) / 2));
@@ -156,19 +170,22 @@ export function createMenu({ tui, theme, done, title, subtitle = "", items, stat
       const list = filtered();
       const mouse = mouseEvent(data);
       if (mouse) {
+        if(mouse.button===35){pointer=mouse;tui.requestRender();return;}
         if (!mouse.press) return;
         if (dimensions !== `${terminal.columns}:${terminal.rows}`) { tui.requestRender(); return; }
         if (mouse.button === 64 || mouse.button === 65) selected = Math.max(0, Math.min(list.length - 1, selected + (mouse.button === 64 ? -1 : 1)));
         else if (mouse.button === 0) {
           const hit = targets.find(t => t.y === mouse.y && mouse.x >= t.x && mouse.x < t.end);
+          if(hit?.index===-3){searchOpen=!searchOpen;query="";selected=0;offset=0;tui.requestRender();return;}
           if (hit) close(hit.index === -1 ? undefined : hit.index === -2 ? backItem : list[hit.index]);
         }
-      } else if (matchesKey(data, "escape")) close(undefined);
+      } else if(searchable&&matchesKey(data,"ctrl+f")){searchOpen=!searchOpen;query="";selected=0;offset=0;}
+      else if (matchesKey(data, "escape")) {if(searchOpen&&layout==="list"){searchOpen=false;query="";selected=0;offset=0;}else close(undefined);}
       else if (matchesKey(data, "up") || matchesKey(data, "shift+tab")) selected = (selected - 1 + list.length) % (list.length || 1);
       else if (matchesKey(data, "down") || matchesKey(data, "tab")) selected = (selected + 1) % (list.length || 1);
       else if (matchesKey(data, "enter")) { if (list[selected]) close(list[selected]); }
-      else if (searchable && matchesKey(data, "backspace")) { query = [...query].slice(0, -1).join(""); offset=0;selected=layout==='list'&&query?filtered().filter(isAction).length:0; }
-      else if (searchable && data && !/[\x00-\x1f\x7f-\x9f]/.test(data)) { query = (query + data).slice(0, 120); offset=0;selected=layout==='list'?filtered().filter(isAction).length:0; }
+      else if (searchable && searchOpen && matchesKey(data, "backspace")) { query = [...query].slice(0, -1).join(""); offset=0;selected=layout==='list'&&query?filtered().filter(isAction).length:0; }
+      else if (searchable && searchOpen && data && !/[\x00-\x1f\x7f-\x9f]/.test(data)) { query = (query + data).slice(0, 120); offset=0;selected=layout==='list'?filtered().filter(isAction).length:0; }
       tui.requestRender();
     },
   };

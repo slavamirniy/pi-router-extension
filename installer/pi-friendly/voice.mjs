@@ -11,7 +11,9 @@ function setupError(error){
 export function appendDictation(draft,text){return text.trim()?draft+(draft&&!/\s$/.test(draft)?' ':'')+text.trim():draft;}
 export function createVoiceService({root,onState=()=>{},onText=()=>{},onError=()=>{},prepare=prepareVoice,spawnWorker=spawn}){
  let state={phase:'installing',label:'Подготовка голоса…'},child,controller,starting,disposed=false,sequence=0,recordingId,recordingContext,levels=[];
- const update=next=>{state=next;if(!disposed)onState(state);};
+ const listeners=new Set();
+ const emit=event=>{for(const fn of listeners){try{fn(event);}catch{}}};
+ const update=next=>{state=next;if(!disposed){onState(state);emit({type:'state',state});}};
  const send=data=>{if(child?.stdin.writable)child.stdin.write(JSON.stringify(data)+'\n');};
  async function start(){
   if(disposed||starting||child)return starting;
@@ -37,14 +39,14 @@ export function createVoiceService({root,onState=()=>{},onText=()=>{},onError=()
  function event(message){
   if(disposed)return;
   if(message.type==='ready')update({phase:'ready',label:'Голос готов'});
-  else if(message.type==='error')onError(message.message);
-  else if(message.type==='text'&&message.id===recordingId){onText(message.text,recordingContext);recordingId=undefined;recordingContext=undefined;}
+  else if(message.type==='error'){onError(message.message);emit({type:'error',message:message.message});}
+  else if(message.type==='text'&&message.id===recordingId){onText(message.text,recordingContext);emit({type:'text',text:message.text,context:recordingContext});recordingId=undefined;recordingContext=undefined;}
   else if(message.id===recordingId&&['recording','transcribing'].includes(message.type)){
    if(message.type==='recording'&&Number.isFinite(message.level))levels=[...levels.slice(-511),Math.max(0,Math.min(1,message.level))];
    update({phase:message.type,label:message.type==='recording'?'Слушаю…':'Распознаю…',seconds:message.seconds,levels,percent:message.type==='transcribing'?(message.percent??0):undefined});
   }
  }
- return {get state(){return state;},start,
+ return {get state(){return state;},start,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},
   toggle(context){
    if(state.phase==='error'){void start();return;}
    if(state.phase==='ready'){
@@ -52,6 +54,6 @@ export function createVoiceService({root,onState=()=>{},onText=()=>{},onError=()
    }else if(state.phase==='recording'){update({phase:'transcribing',label:'Распознаю…',percent:0});send({type:'stop',id:recordingId});}
   },
   cancel(){if(recordingId){send({type:'cancel',id:recordingId});recordingId=undefined;recordingContext=undefined;}},
-  dispose(){disposed=true;controller?.abort();send({type:'shutdown'});child?.kill();child=undefined;},
+  dispose(){disposed=true;listeners.clear();controller?.abort();send({type:'shutdown'});child?.kill();child=undefined;},
  };
 }

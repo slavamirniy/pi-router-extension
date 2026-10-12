@@ -11,7 +11,7 @@ export async function prepareFriendly(settings, configDir, source = bundle) {
   const manifest = JSON.parse((await fs.readFile(path.join(source, 'bundle.json'), 'utf8')).replace(/^\uFEFF/, ''));
   const contents = new Map();
   for (const [file, hash] of Object.entries(manifest.files)) {
-    if (!/^[a-zA-Z0-9_.-]+$/.test(file)) throw new Error('Invalid UI bundle path');
+    if (!/^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)*$/.test(file) || file.split('/').some(p => p === '.' || p === '..')) throw new Error('Invalid UI bundle path');
     const data = await fs.readFile(path.join(source, file));
     if (createHash('sha256').update(data).digest('hex') !== hash) throw new Error('UI bundle integrity check failed');
     contents.set(file, data);
@@ -46,7 +46,7 @@ export async function prepareFriendly(settings, configDir, source = bundle) {
     await fs.mkdir(staging, {recursive:true, mode:0o700});
     let moved = false;
     try {
-      for (const [file, data] of contents) await fs.writeFile(path.join(staging, file), data, {mode:0o600});
+      for (const [file, data] of contents) { await fs.mkdir(path.dirname(path.join(staging,file)), {recursive:true,mode:0o700}); await fs.writeFile(path.join(staging, file), data, {mode:0o600}); }
       await fs.copyFile(path.join(source, 'bundle.json'), path.join(staging, 'bundle.json'));
       await fs.mkdir(path.dirname(destination), {recursive:true, mode:0o700});
       await fs.mkdir(path.dirname(saved), {recursive:true, mode:0o700});

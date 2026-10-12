@@ -9,8 +9,8 @@ TASK_MAC_TMP="$(mktemp -d "${TMPDIR:-/tmp}/ai-diy-install.XXXXXXXX")"
 cleanup_mac() { [[ "${TASK_MAC_TMP##*/}" == ai-diy-install.* ]] && rm -rf -- "$TASK_MAC_TMP"; }
 trap cleanup_mac EXIT
 TASK_ASSETS='https://raw.githubusercontent.com/slavamirniy/pi-router-extension/cc566974dd517f4c438aa84ca6ac05a3eb5defac'
-curl --retry 2 --retry-all-errors --retry-delay 1 --connect-timeout 10 --max-time 90 -fsSL --proto '=https' --tlsv1.2 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.10/installer/install-pi-linux.sh' -o "$TASK_MAC_TMP/common.sh"
-TASK_COMMON_HASH='2784454cf52b1cebe19adb805e14551e6ff8470dc24efa238d2fa47e7ac96d40'
+curl --retry 2 --retry-all-errors --retry-delay 1 --connect-timeout 10 --max-time 90 -fsSL --proto '=https' --tlsv1.2 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.11/installer/install-pi-linux.sh' -o "$TASK_MAC_TMP/common.sh"
+TASK_COMMON_HASH='d960514cf187dd88c90831d292c1567d99a7ee7cab06c3b0caf94978b101de9d'
 [[ "$(shasum -a 256 "$TASK_MAC_TMP/common.sh" | cut -d ' ' -f 1)" == "$TASK_COMMON_HASH" ]] || { echo 'Installer integrity check failed.' >&2; exit 1; }
 bash "$TASK_MAC_TMP/common.sh"
 unset PI_API_KEY PI_BASE_URL PI_DEFAULT_MODEL
@@ -30,4 +30,4 @@ for task_file in installer/desktop.mjs assets/ai-diy.icns; do
 done
 TASK_MAC_TMP="$TASK_MAC_TMP" "$TASK_NODE" -e 'const fs=require("fs"),c=require("crypto"),p=require("path");for(const [f,h] of [["installer/desktop.mjs","3951fdceccaee938081d8716a28621a91a50b69de5f023341392adee57ef0fd1"],["assets/ai-diy.icns","b6502574a941ea5c87d067a46dd515a6adc0609ffe3d09faca8c78840616bad4"]]){if(c.createHash("sha256").update(fs.readFileSync(p.join(process.env.TASK_MAC_TMP,f))).digest("hex")!==h)throw Error("Installer integrity check failed")}'
 "$TASK_NODE" "$TASK_MAC_TMP/installer/desktop.mjs" "$HOME" "$TASK_NODE" "$TASK_PI" "$TASK_MAC_TMP/assets/ai-diy.icns"
-if [[ "$TASK_START" != 1 ]]; then open "$HOME/Desktop/AI своими руками.app"; fi
+if [[ "$TASK_START" != 1 ]]; then open "$HOME/Desktop/AI СЃРІРѕРёРјРё СЂСѓРєР°РјРё.app"; fi

@@ -19,7 +19,7 @@ test('new and repeated installations load both plugins and preserve user project
   const options = {configDir:dir, apiKey:'synthetic', baseURL:'https://example.test/v1'};
   assert.equal((await configure(options, {fetch})).uiInstalled, true);
   const ui = path.join(dir, 'extensions/pi-friendly');
-  for (const file of ['index.ts','friendly.mjs','surface.mjs','voice.mjs','voice-setup.mjs','voice-worker.py','voice_audio.py']) {
+  for (const file of ['index.ts','friendly.mjs','surface.mjs','voice.mjs','voice-setup.mjs','voice-worker.py','voice_audio.py','web-server.mjs','web-rpc.mjs','web/index.html','web/app.js','web/app.css']) {
     assert.ok((await fs.stat(path.join(ui,file))).size);
   }
   await fs.writeFile(path.join(dir,'friendly-ui.json'), '{"theme":"dark"}');
