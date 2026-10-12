@@ -6,8 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { modelsURL, mergeModels } from '../models.mjs';
 import { prepareFriendly } from './friendly.mjs';
 
-const source = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const extensionFiles = ['index.ts', 'models.mjs', 'progress.mjs', 'safety.mjs'];
 async function readJSON(file, fallback) {
   let raw;
   try { raw=await fs.readFile(file); }
@@ -87,16 +85,14 @@ export async function configure(options, dependencies={}) {
   settings.defaultProvider=provider;
   if(selected) settings.defaultModel=selected;
   else delete settings.defaultModel;
-  const contents=await Promise.all(extensionFiles.map(file=>fs.readFile(path.join(source,file))));
   const installFriendly=await prepareFriendly(settings,configDir);
-  const stamp=`${Date.now()}.${process.pid}`,destination=path.join(configDir,'extensions','llmsrouter-progress');
+  const stamp=`${Date.now()}.${process.pid}`;
   await fs.mkdir(configDir,{recursive:true,mode:0o700});
   await backup(modelsFile,stamp);await backup(settingsFile,stamp);
   await installFriendly(stamp);
-  for(let i=0;i<extensionFiles.length;i++) {const file=path.join(destination,extensionFiles[i]);await backup(file,stamp);await atomic(file,contents[i]);}
   await atomic(modelsFile,JSON.stringify(models,null,2)+'\n');
   await atomic(settingsFile,JSON.stringify(settings,null,2)+'\n');
-  return {provider,baseURL,configDir,connectionChanged,models:discovered.length,refreshed,defaultModel:selected,preferredModelUnavailable,extensionInstalled:true,uiInstalled:true};
+  return {provider,baseURL,configDir,connectionChanged,models:discovered.length,refreshed,defaultModel:selected,preferredModelUnavailable,extensionInstalled:true,uiInstalled:true,uiVersion:installFriendly.version};
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
@@ -104,7 +100,8 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     const input=readFileSync(0,'utf8');
     const options=input.includes('\0')?Object.fromEntries(['apiKey','baseURL','provider','defaultModel','configDir'].map((k,i)=>[k,input.split('\0')[i]||undefined])):JSON.parse(input);
     const result=await configure(options);
-    console.log(`Pi configured: ${result.provider}, ${result.models} models. UI and quota extensions installed.`);
+    console.log(`Pi configured: ${result.provider}, ${result.models} models. Installed pi-friendly ${result.uiVersion} (browser UI and quota included).`);
+    console.log('Restart any previously running Pi session to use the updated interface.');
     console.log(`API address: ${result.baseURL}\nConfiguration: ${result.configDir}`);
     if(!result.refreshed) console.warn(result.connectionChanged?'Connection updated. Model list unavailable; pi will try again on startup.':'Model list could not be refreshed. Previous models retained; pi will try again on startup.');
     if(result.preferredModelUnavailable&&result.defaultModel) console.warn(`Preferred model unavailable. Selected: ${result.defaultModel}`);

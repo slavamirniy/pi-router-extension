@@ -61,27 +61,35 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
   left[1]=paint('  '+bold('Просто pi'),side,p.sidebar,p.text);
   const button=(y,label,run,primary=false,danger=false,disabled=false)=>{
    if(y<3||y+2>=height)return;
-   const w=side,bg=disabled?p.button:danger?p.errorBg:primary?(s.paneOpen?p.selection:p.bubble):p.button,fg=disabled?p.muted:danger?p.error:primary?(s.paneOpen?p.text:p.accent):p.text;
+   const returning=primary&&run===actions.newChat&&s.paneOpen;
+   const w=side,bg=disabled?p.button:danger?p.errorBg:primary?(returning?p.selection:p.bubble):p.button,fg=disabled?p.muted:danger?p.error:primary?(returning?p.text:p.accent):p.text;
    const rows=buttonRows(label,w,truncate,measure);
    for(let dy=0;dy<3;dy++)left[y+dy]=paint(dy===2?'▁'.repeat(w):rows[dy],w,!disabled&&hovering(0,y,w,3)?shade(bg):bg,dy===2?p.border:fg);
    if(!disabled)targets.push({x:0,y,w,h:3,run});
   };
   const exitY=height-3,footerY=height-6;
-  if(height>=27){
+  const themeX=side-5,themeIcon=s.scheme==='dark'?'☀':'☾';
+  left[1]=paint('  '+bold('Просто pi'),themeX,p.sidebar,p.text)+paint(centered(themeIcon,4,truncate,measure),4,hovering(themeX,0,4,3)?p.button:p.sidebar,p.accent)+paint('',1,p.sidebar);
+  targets.push({x:themeX,y:0,w:4,h:3,run:actions.theme});
+  if(height>=21){
    button(4,s.paneOpen?'Вернуться к чату':side<24?'Новый чат':'Новый разговор',actions.newChat,true);
-   button(7,'Проекты',actions.history);button(10,'Модель',actions.model);
-   button(13,s.scheme==='dark'?'Светлая тема':'Тёмная тема',actions.theme);
-   if(actions.web)button(16,side<24?'Веб-интерфейс':'Открыть в браузере',actions.web);
-  }else if(height>=21){
-   button(3,s.paneOpen?'← В чат':'Новый чат',actions.newChat,true);button(6,'Проекты',actions.history);
-   button(9,'Ещё',actions.more);if(actions.web)button(12,'Веб-интерфейс',actions.web);
+   button(7,'Проекты',actions.history);
+   if(actions.web)button(10,side<24?'Веб-интерфейс':'Открыть в браузере',actions.web);
   }else{
-   button(3,'Ещё',actions.more);if(actions.web&&height>=15)button(6,'Веб-интерфейс',actions.web);
+   const labels=[s.paneOpen?'← В чат':'Новый чат','Проекты','Веб-интерфейс'];
+   [actions.newChat,actions.history,actions.web].forEach((run,i)=>{if(run){left[3+i]=paint(centered(labels[i],side,truncate,measure),side,p.button,p.text);targets.push({x:0,y:3+i,w:side,h:1,run});}});
   }
   button(exitY,'🚪 Выйти',actions.exit,false,true,!ctx.isIdle());
-  left[footerY]=paint('  '+clean(ctx.model?.name||ctx.model?.id||'Выберите модель'),side,p.sidebar,p.muted);
+  left[footerY]=paint('',side,p.sidebar);
   const quota=(s.statuses??[]).find(v=>/осталось|quota|remaining/i.test(clean(v)));
   if(quota)left[footerY+1]=paint('  '+clean(quota),side,p.sidebar,p.muted);
+  if(actions.balance){
+   const amount=s.billing?.account?.available;
+   left[footerY-2]=paint(centered(amount==null?'Баланс уточняется':Intl.NumberFormat('ru-RU',{notation:'compact',maximumFractionDigits:1}).format(Math.max(0,amount))+' токенов',side,truncate,measure),side,p.sidebar,p.muted);
+   left[footerY-1]=paint('',side,p.sidebar);
+   button(footerY,'Пополнить баланс',actions.balance,true);
+  }
+
   put(1,s.needsProject?'Ваши проекты':s.projectName?'Проект: '+clean(s.projectName):chatMessages(ctx,s.live).length?'Разговор':'Новый разговор',p.canvas,p.muted);
   const send=ctx.isIdle()?(delegate.getText().startsWith('/')?'Выполнить':'Отправить ↑'):'Остановить';
   const voice=s.voice,voiceHint=(s.voiceHintUntil??0)>Date.now(),voiceBusy=['starting','recording','transcribing'].includes(voice?.phase);
@@ -134,17 +142,22 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
   if(micW&&micEnabled)targets.push({x:inlineSend?side+pad+cw-sendW-micW-3:side+pad+cw-micW-2,y:micY,w:micW,h:sendHeight,run:actions.voice});
   if(enabled)targets.push({x:side+pad+cw-sendW-2,y:actionY,w:sendW,h:sendHeight,run:ctx.isIdle()?actions.submit:()=>ctx.abort()});
   put(editorTop+innerHeight+1,'╰'+'─'.repeat(cw-2)+'╯',p.canvas,p.border);
+  const modelLabel=clean(ctx.model?.name||ctx.model?.id||'Выберите модель')+' ▾';
+  const modelW=Math.min(cw,Math.max(18,measure(modelLabel)+4));
+  const modelY=editorTop+innerHeight+2,modelX=side+pad;
+  right[modelY]=paint('',pad)+paint(centered(modelLabel,modelW,truncate,measure),modelW,ctx.isIdle()&&hovering(modelX,modelY,modelW,1)?p.button:p.canvas,ctx.isIdle()?p.accent:p.muted)+paint('',main-pad-modelW);
+  if(ctx.isIdle())targets.push({x:modelX,y:modelY,w:modelW,h:1,run:actions.model});
   if(!delegate.getText())put(editorTop-1,'Сообщение',p.canvas,p.muted);
   let info=s.running?'◌ Готовлю ответ…':s.notice||s.activity||'';
   const widgetLines=[];
   for(const widget of s.widgets??[]) {try {widgetLines.push(...(Array.isArray(widget)?widget:widget.render(cw)));}catch{}}
-  if(widgetLines.length && !s.notice && !s.running)info=clean(widgetLines.at(-1));
+  if(widgetLines.length && (s.running || !s.notice))info=clean(widgetLines.at(-1));
   if(info)put(editorTop-1,truncate(clean(info),cw,''),p.canvas,s.notice?p.accent:p.muted);
   if(voice?.phase==='recording'){const seconds=Math.floor(voice.seconds??0);put(editorTop-1,`● ${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} · Enter — закончить запись`,p.canvas,p.accent);}
   if(voice&&height>=23&&['installing','downloading','loading','error'].includes(voice.phase)){
    const pct=Number.isFinite(voice.percent)?` ${voice.percent}%`:'';
    const sideLabel=voice.phase==='error'?'Повторить голос':voice.phase==='downloading'?'Модель'+pct:voice.label||'Подготовка голоса';
-   const sy=height>=27?height-8:height-7,voiceBg=voiceHint?p.selection:p.sidebar;if(sy>=3)left[sy]=paint('  '+sideLabel,side,voiceBg,voiceHint?p.text:voice.phase==='error'?p.error:p.muted);
+   const sy=height-10,voiceBg=voiceHint?p.selection:p.sidebar;if(sy>=3)left[sy]=paint('  '+sideLabel,side,voiceBg,voiceHint?p.text:voice.phase==='error'?p.error:p.muted);
    if(height>=31&&Number.isFinite(voice.percent)){
     const fill=Math.max(0,Math.min(10,Math.round(voice.percent/10)));left[sy-1]=paint('  '+'━'.repeat(fill)+'─'.repeat(10-fill),side,voiceBg,p.accent);
    }
@@ -170,14 +183,14 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
    }
   }
   if(failure){
-   const friendly={title:failure.kind==='tool'?'Не удалось выполнить действие':'Не удалось получить ответ',help:'Сообщения сохранены. Можно повторить запрос.'},space=Math.max(3,editorTop-3);
+   const friendly={title:failure.kind==='tool'?'Не удалось выполнить действие':'Не удалось получить ответ',help:'Сообщения сохранены. Можно повторить запрос.'},space=Math.max(3,Math.min(8,editorTop-3));
    const detailLines=wrapText(friendly.help,cw-4),titleLines=wrapText('! '+friendly.title,cw-4);
    const rawLines=wrapText(clean(failure.raw),cw-4),limit=Math.max(1,space-2-titleLines.length);errorMax=Math.max(0,rawLines.length-limit);errorOffset=Math.min(errorOffset,errorMax);
    const body=[...titleLines,...(errorExpanded?rawLines.slice(errorOffset,errorOffset+limit):detailLines)];
    const lines=body.slice(0,Math.max(1,space-2)),top=editorTop-lines.length-3;
-   lines.forEach((line,n)=>put(top+n,'  '+line,p.errorBg,p.error));
+   lines.forEach((line,n)=>put(top+n,line,p.canvas,p.error));
    const label=errorExpanded?(errorMax?' Скрыть ▴ · прокрутите текст колёсиком ':' Скрыть подробности ▴ '):' Подробнее ▾ ',y=top+lines.length;
-   put(y,centered(label,cw,truncate,measure),p.errorBg,p.error);
+   put(y,label.trim(),p.canvas,p.muted);
    targets.push({x:side+pad,y,w:cw,h:1,run:()=>{errorExpanded=!errorExpanded;tui.requestRender();}});
    errorRect={x:side+pad,y:top,w:cw,h:lines.length+1};contentBottom=top-1;
   }

@@ -1,3 +1,5 @@
+import {createModelPicker} from './model-picker.mjs';
+import {createBillingPanel} from './billing-panel.mjs';
 import {appendDictation} from './voice.mjs';
 import {requestExit,createExitDialog} from './exit-dialog.mjs';
 import { createMenu, clean, mouseEvent } from "./menu.mjs";
@@ -19,6 +21,9 @@ export function groupProjects(sessions) {
 }
 
 export function installFriendly(pi, rendering) {
+  let billingCtx,lastBillingAccess="";
+  const unsubBilling=rendering.billing?.subscribe(b=>{workspace?.redraw();if(b.access==="ready")lastBillingAccess="";if(billingCtx&&!opened&&!rendering.isWebActive?.()&&billingCtx.isIdle()&&["empty","expired","key_expired"].includes(b.access)&&lastBillingAccess!==b.access){lastBillingAccess=b.access;void safe(billingCtx,()=>balance(billingCtx))();}});
+  pi.on("session_shutdown",()=>unsubBilling?.());
   let view = { scheme: rendering.loadPrefs?.()?.scheme === "dark" ? "dark" : "light", live: undefined, notice: "", activity: "" };
   const widgets = new Map();
   const projects=rendering.projects; let pendingDraft,voice,voiceContext,voiceHintTimer;
@@ -33,7 +38,7 @@ export function installFriendly(pi, rendering) {
   const notifyError = (ctx, error) => { if (!stopped) ctx.ui.notify(`Не удалось выполнить действие: ${clean(error?.message ?? error)}`, "warning"); };
   const safe = (ctx, fn) => async () => { try { if(rendering.isWebActive?.())return;await fn(); } catch (error) { notifyError(ctx, error); } };
 
-  async function choose(ctx, title, items, searchable = false, subtitle = "", form = false, bottom = false, layout = 'cards') {
+  async function choose(ctx, title, items, searchable = false, subtitle = "", form = false, bottom = false, layout = 'cards', customFactory) {
     return ctx.ui.custom((tui, theme, _keys, done) => {
       let lastFrame, inner, creating=false;
       const finish=value=>{
@@ -49,7 +54,7 @@ export function installFriendly(pi, rendering) {
         if((value?.navigation||value?.session||value?.id==='new'||value?.id==='current')&&lastFrame)workspace?.holdFrame(lastFrame);
         done(value);
       };
-      const makeMenu=()=>form?createProjectForm({...rendering,tui,done:finish,palette:palettes[view.scheme]}):createMenu({...rendering,tui,theme,done:finish,title,subtitle,items,searchable,bottom,layout,panel:Boolean(workspace),palette:rendering.makeEditor?palettes[view.scheme]:undefined,statuses:()=>[modelLabel(ctx),...statuses()]});
+      const makeMenu=()=>customFactory?customFactory({...rendering,tui,theme,done:finish,panel:Boolean(workspace),palette:palettes[view.scheme]}):form?createProjectForm({...rendering,tui,done:finish,palette:palettes[view.scheme]}):createMenu({...rendering,tui,theme,done:finish,title,subtitle,items,searchable,bottom,layout,panel:Boolean(workspace),palette:rendering.makeEditor?palettes[view.scheme]:undefined,statuses:()=>[modelLabel(ctx),...statuses()]});
       inner=makeMenu();
       activeMenu = {
         invalidate: () => inner.invalidate(), dispose: () => inner.dispose(),
@@ -80,7 +85,7 @@ export function installFriendly(pi, rendering) {
     if (ctx.mode !== "tui" || opened || stopped || view.loading) return;
     opened = true;
     try { return await fn(); }
-    finally { activeMenu?.dispose(); activeMenu = undefined; opened = false; }
+    finally { activeMenu?.dispose(); activeMenu = undefined; opened = false; workspace?.redraw(); }
   }
   async function command(ctx, text) {
     if (!ctx.isIdle()) { ctx.ui.notify("Сначала дождитесь ответа или нажмите «Остановить».", "info"); return; }
@@ -94,8 +99,10 @@ export function installFriendly(pi, rendering) {
     if (!ctx.isIdle()) { ctx.ui.notify("Модель можно сменить после завершения ответа.", "info"); return; }
     const models = ctx.modelRegistry.getAvailable();
     if (!models.length) { ctx.ui.notify("Нет доступных моделей. Добавьте подключение через /login.", "warning"); return; }
-    const selected = await dialog(ctx, () => choose(ctx, "Выберите модель", models.map(model => ({ model, label: model.name || model.id, description: `${model.provider} / ${model.id}` })), true));
-    if (selected && !await pi.setModel(selected.model)) ctx.ui.notify("Модель недоступна: проверьте подключение.", "warning");
+    const selected = await dialog(ctx, () => workspace?ctx.ui.custom((tui,_theme,_keys,done)=>{
+      activeMenu=createModelPicker({...rendering,tui,models,current:ctx.model,done,palette:palettes[view.scheme],background:width=>workspace.renderSurface(width)});return activeMenu;
+    },{overlay:true,overlayOptions:{width:'100%',maxHeight:'100%',row:0,col:0,margin:0}}):choose(ctx, "Выберите модель", models.map(model => ({ model, label: model.name || model.id, description: model.provider })), true));
+    if (selected && !await pi.setModel(selected.model||selected)) ctx.ui.notify("Модель недоступна: проверьте подключение.", "warning");
   }
   async function withLoading(label,fn){view.loading=label;workspace?.clearHeldFrame();workspace?.redraw();try{await new Promise(resolve=>setTimeout(resolve,20));return await fn();}finally{view.loading='';workspace?.redraw();}}
   async function switchChat(ctx,path){return withLoading('Открываю разговор…',()=>performSwitchChat(ctx,path));}
@@ -142,7 +149,7 @@ export function installFriendly(pi, rendering) {
   async function history(ctx){
     if(!ctx.isIdle()){ctx.ui.notify('Сначала остановите текущую работу.','info');return;}
     const choice=await dialog(ctx,async()=>{
-      const sessions=await withLoading('Загружаю проекты и разговоры…',()=>rendering.listSessions());
+      const sessions=await rendering.listSessions();
       if(!projects){return choose(ctx,'История разговоров',sessions.map(session=>({session,label:session.name||clean(session.firstMessage)||'Без названия',description:session.cwd})),true);}
       const registered=projects.list();
       let catalog=projectCatalog(sessions,registered,currentFolder(ctx));
@@ -202,12 +209,17 @@ export function installFriendly(pi, rendering) {
     });
     if (selected?.command) await command(ctx, selected.command);
   }
+  async function balance(ctx) {
+    if(!rendering.billing)return;
+    await dialog(ctx,()=>choose(ctx,'Пополнить баланс',[],false,'',false,false,'cards',options=>createBillingPanel({...options,billing:rendering.billing,openExternal:rendering.openExternal})));
+  }
   async function more(ctx) {
     const item = await dialog(ctx, () => choose(ctx, "Действия", [
-      {label: "Модель", id:"model"}, {label:"История",id:"history"},
+      {label: "Модель", id:"model"}, {label:"Баланс и пополнение",id:"balance"}, {label:"История",id:"history"},
       ...(rendering.openWeb?[{label:"Открыть в браузере",id:"web"}]:[]),
       {label:"Сменить тему",id:"theme"}, {label:"Меню",id:"menu"},
     ], true));
+    if(item?.id === "balance")await balance(ctx);
     if(item?.id === "model") await selectModel(ctx);
     if(item?.id === "web") await rendering.openWeb?.(ctx,voice,statuses);
     if(item?.id === "history") await command(ctx,"/friendly history");
@@ -231,7 +243,7 @@ export function installFriendly(pi, rendering) {
     if (action?.id === "new") await newConversation(ctx);
     if (action?.id === "history") await command(ctx, "/friendly history");
   }
-  pi.registerCommand("friendly", { description: "Новый разговор и история по проектам", handler: async (args, ctx) => safe(ctx, () => args.startsWith("open ") ? switchChat(ctx,decodeURIComponent(args.slice(5))) : args.trim()==="web" ? rendering.openWeb?.(ctx,voice,statuses) : args.trim()==="new" ? newConversation(ctx) : args.trim() === "history" ? history(ctx) : args.trim() === "commands" ? commands(ctx) : menu(ctx))() });
+  pi.registerCommand("friendly", { description: "Новый разговор и история по проектам", handler: async (args, ctx) => safe(ctx, () => args.startsWith("open ") ? switchChat(ctx,decodeURIComponent(args.slice(5))) : args.trim()==="balance" ? balance(ctx) : args.trim()==="web" ? rendering.openWeb?.(ctx,voice,statuses) : args.trim()==="new" ? newConversation(ctx) : args.trim() === "history" ? history(ctx) : args.trim() === "commands" ? commands(ctx) : menu(ctx))() });
   pi.registerShortcut("f2", { description: "Открыть меню Просто pi", handler: ctx => safe(ctx, () => menu(ctx))() });
   pi.on("input",(event,ctx)=>{
     if(ctx.mode==='tui'&&event.source!=='extension'&&rendering.isWebActive?.())return {action:'handled'};
@@ -243,6 +255,7 @@ export function installFriendly(pi, rendering) {
   });
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
+    billingCtx=ctx;
     restoreUI(); clearTimeout(noticeTimer);
     voice?.cancel();voiceContext=ctx;clearTimeout(voiceHintTimer);view.voiceHintUntil=0;
     if(!voice&&rendering.createVoice){
@@ -285,9 +298,10 @@ export function installFriendly(pi, rendering) {
         workspace?.dispose();
         const delegate = previousFactory ? previousFactory(tui, editorTheme, keys) : rendering.makeEditor(tui, editorTheme, keys);
         workspace = createWorkspace({ delegate, tui, theme: ctx.ui.theme, rendering, ctx,
-          cleanView: true, viewState: () => ({...view, webActive:rendering.isWebActive?.(), paneOpen:opened, projectName:hasProject(ctx)?projects?.name(currentFolder(ctx)):undefined, needsProject:!hasProject(ctx), widgets:[...widgets.values()], statuses:statuses()}),
+          cleanView: true, viewState: () => ({...view, billing:rendering.billing?.snapshot(), webActive:rendering.isWebActive?.(), paneOpen:opened, projectName:hasProject(ctx)?projects?.name(currentFolder(ctx)):undefined, needsProject:!hasProject(ctx), widgets:[...widgets.values()], statuses:statuses()}),
           footerHeight: () => footerRows, slashEnabled: !pi.getFlag("friendly-keep-footer"),
           actions: {
+            balance:safe(ctx,()=>balance(ctx)),
             web: safe(ctx,()=>rendering.openWeb?.(ctx,voice,statuses)), newChat: safe(ctx, () => newConversation(ctx)), history: safe(ctx, () => history(ctx)),
             theme: safe(ctx, () => changeTheme(ctx)), more: safe(ctx, () => more(ctx)),
             menu: safe(ctx, () => menu(ctx)), model: safe(ctx, () => selectModel(ctx)),

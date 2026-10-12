@@ -1,6 +1,6 @@
 {
   "name": "pi-friendly",
-  "version": "0.10.4",
+  "version": "0.12.4",
   "type": "module",
   "description": "Просто pi: понятное меню с мышью и компактный интерфейс",
   "license": "MIT",
@@ -13,7 +13,7 @@
     ]
   },
   "scripts": {
-    "test": "node --test *.test.mjs"
+    "test": "node --test *.test.mjs router/*.test.mjs"
   },
   "repository": {
     "type": "git",

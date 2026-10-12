@@ -5,7 +5,7 @@ export function createRpc({cli,cwd,path,model,onEvent=()=>{},spawnProcess=spawn}
  const args=[cli,'--mode','rpc','--session',path];
  if(model?.id&&model?.provider)args.push('--provider',model.provider,'--model',model.id);
  const child=spawnProcess(process.execPath,args,{cwd,windowsHide:true,stdio:['pipe','pipe','pipe'],env:{...process.env,PI_FRIENDLY_WEB_CHILD:'1'}});
- const pending=new Map();let buffer='',stderr='',closed=false;
+ const pending=new Map();let buffer='',stderr='',stderrBuffer='',closed=false;
  const fail=error=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(error);}pending.clear();};
  child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{
   buffer+=chunk;
@@ -15,7 +15,22 @@ export function createRpc({cli,cwd,path,model,onEvent=()=>{},spawnProcess=spawn}
    else onEvent(event);
   }
  });
- child.stderr.on('data',chunk=>{stderr=(stderr+chunk).slice(-1200);});
+ child.stderr.setEncoding('utf8');
+ child.stderr.on('data',chunk=>{
+  stderrBuffer+=chunk;
+  if(stderrBuffer.length>65536){stderr=(stderr+stderrBuffer.slice(-1200)).slice(-1200);stderrBuffer='';return;}
+  let i;while((i=stderrBuffer.indexOf('\n'))>=0){const line=stderrBuffer.slice(0,i).replace(/\r$/,'');stderrBuffer=stderrBuffer.slice(i+1);
+   if(line.startsWith('PI_FRIENDLY_PROGRESS ')){
+    try{const event=JSON.parse(line.slice('PI_FRIENDLY_PROGRESS '.length));if(event.type!=='friendly_router_progress')continue;const p=event.progress;
+     if(p===null){onEvent({type:event.type,progress:null});continue;}
+     if(!p||!['waiting','generating','retrying','streaming','completed','failed','cancelled'].includes(p.state)||typeof p.requestId!=='string'||!/^[A-Za-z0-9_-]{8,64}$/.test(p.requestId))continue;
+     const number=n=>Number.isSafeInteger(n)&&n>=0?n:undefined;
+     onEvent({type:event.type,progress:{requestId:p.requestId,state:p.state,preview:typeof p.preview==='string'?Array.from(p.preview).slice(-100).join(''):'',elapsedMs:number(p.elapsedMs),quota:number(p.quota),estimated:p.estimated!==false,available:number(p.available),attempt:number(p.attempt)}});
+    }catch{}continue;
+   }
+   stderr=(stderr+line+'\n').slice(-1200);
+  }
+ });
  child.stdin.on('error',error=>fail(error));child.on('error',error=>{fail(error);onEvent({type:'process_error',message:error.message});});
  child.on('close',code=>{const wasClosed=closed;closed=true;fail(new Error('Процесс pi завершился. '+stderr));if(!wasClosed)onEvent({type:'process_error',message:`pi завершился (${code}). Откройте чат повторно.`});});
  return {

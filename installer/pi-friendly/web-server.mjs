@@ -14,19 +14,21 @@ const exists=async p=>{try{await stat(p);return true;}catch{return false;}};
 const dirnameOf=p=>{const parent=resolve(p,'..');return parent===p||!p?resolve(p):parent;};
 import {publicMessage,publicMessages,mergeMessage,reconcileMessages,toolView,updateTool} from './web-messages.mjs';
 export {publicMessage,publicMessages} from './web-messages.mjs';
-export async function startWebServer({projects,listSessions,readSession,makeRpc,makeHostRpc,getHostStatuses=()=>[],models=()=>[],hostSession=()=>undefined,voice,port=0,onExit=()=>{},canExit=()=>true,getPreferredModel=()=>undefined,onModelSelected=()=>{},pickProjectFolder}){
+export async function startWebServer({billing,projects,listSessions,readSession,makeRpc,makeHostRpc,getHostStatuses=()=>[],models=()=>[],hostSession=()=>undefined,voice,port=0,onExit=()=>{},canExit=()=>true,getPreferredModel=()=>undefined,onModelSelected=()=>{},pickProjectFolder}){
  const token=randomBytes(32).toString('hex'),cookie='pf_'+randomBytes(6).toString('hex'),clients=new Set();
  let rpc,active,loading=false,navigating=false,disposed=false,allProjects=[],allSessions=[],generation=0,publishTimer,voiceOwned=false;
  let state={active:null,messages:[],busy:false,loading:false,error:null,notice:'',statuses:{},widgets:{},questions:[],voice:voice?.state||null,dictation:null};
- const snapshot=()=>({...state,statuses:{...state.statuses,...(active?.host?Object.fromEntries(getHostStatuses().map((s,i)=>['host-'+i,clean(s)])):{})},loading,active});
+ const snapshot=()=>({...state,billing:billing?.snapshot(),statuses:{...state.statuses,...(active?.host?Object.fromEntries(getHostStatuses().map((s,i)=>['host-'+i,clean(s)])):{})},loading,active});
  const broadcast=()=>{clearTimeout(publishTimer);publishTimer=undefined;const data='data: '+JSON.stringify(snapshot())+'\n\n';for(const client of clients){if(client.writableLength>2*1024*1024){client.destroy();clients.delete(client);}else client.write(data);}};
  const changed=()=>{if(!publishTimer)publishTimer=setTimeout(broadcast,35);};
+ const unsubBilling=billing?.subscribe(()=>changed());
  const unsub=voice?.subscribe?.(event=>{if(event.type==='state'){state.voice=event.state;if(['ready','error'].includes(event.state.phase))voiceOwned=false;changed();}if(event.type==='text'&&event.context?.web){state.dictation={id:randomBytes(8).toString('hex'),text:event.text,chat:event.context.chat};voiceOwned=false;changed();}if(event.type==='error'&&voiceOwned){state.error=event.message;voiceOwned=false;changed();}});
  async function catalog(){allProjects=projects.list();const registered=new Set(allProjects.map(p=>folderKey(p.cwd)));allSessions=(await listSessions()).filter(s=>s.cwd&&registered.has(folderKey(s.cwd)));return allProjects.map(p=>({id:key(folderKey(p.cwd)),name:p.name,folder:p.cwd,chats:allSessions.filter(s=>folderKey(s.cwd)===folderKey(p.cwd)).sort((a,b)=>+new Date(b.modified)-+new Date(a.modified)).map(s=>({id:key(s.path),name:s.name||s.firstMessage?.slice(0,80)||'Новый разговор',modified:s.modified,count:s.messageCount||0,terminal:s.path===hostSession()}))}));}
  const ensureIdle=()=>{if(loading||navigating||state.busy||voiceOwned||!canExit())throw new Error('Сначала завершите запись или остановите ответ.');};
  function eventHandler(event,epoch){
   if(epoch!==generation||disposed)return;
-  if(event.type==='agent_start'){state.busy=true;state.error=null;}
+  if(event.type==='agent_start'){state.busy=true;state.error=null;state.routerProgress=null;}
+  if(event.type==='friendly_router_progress'){state.routerProgress=event.progress||null;}
   if(event.type==='agent_end'){rpc?.request('get_messages').then(data=>{if(epoch===generation){state.messages=reconcileMessages(state.messages,publicMessages(data?.messages||[]));changed();}}).catch(()=>{});}
   if(event.type==='message_start'&&['user','assistant'].includes(event.message?.role))state.messages.push({...publicMessage(event.message),status:event.message.role==='assistant'?'streaming':'done'});
   if(event.type==='message_update'){
@@ -65,8 +67,8 @@ export async function startWebServer({projects,listSessions,readSession,makeRpc,
    const p=allProjects.find(p=>folderKey(p.cwd)===folderKey(session.cwd));if(!p||!projects.isProject(p.cwd))throw new Error('Выберите существующий проект.');
    projects.markOpened?.(p.cwd);
    active={id:key(session.path),projectId:key(folderKey(p.cwd)),projectName:p.name,name:session.name||session.firstMessage?.slice(0,80)||'Новый разговор',host:session.path===hostSession(),readOnly:session.path===hostSession()&&!makeHostRpc};
-   state={...state,messages:publicMessages(readSession(session.path)),busy:false,error:null,notice:'',questions:[],statuses:{},widgets:{}};
-   if(!active.readOnly){rpc=(session.path===hostSession()&&makeHostRpc?makeHostRpc:makeRpc)({cwd:p.cwd,path:session.path,onEvent:e=>eventHandler(e,epoch)});const [current,messages]=await Promise.all([rpc.request('get_state'),rpc.request('get_messages')]);active.model=current?.model?{id:current.model.id,provider:current.model.provider,name:current.model.name}:null;state.busy=Boolean(current?.isStreaming);const preferred=getPreferredModel();if(preferred&&!state.busy){await rpc.request('set_model',{provider:preferred.provider,modelId:preferred.id});active.model={id:preferred.id,provider:preferred.provider,name:preferred.name};}state.messages=publicMessages(messages?.messages||[]);}
+   state={...state,routerProgress:null,messages:publicMessages(readSession(session.path)),busy:false,error:null,notice:'',questions:[],statuses:{},widgets:{}};
+   if(!active.readOnly){rpc=(session.path===hostSession()&&makeHostRpc?makeHostRpc:makeRpc)({cwd:p.cwd,path:session.path,onEvent:e=>eventHandler(e,epoch)});const [current,messages]=await Promise.all([rpc.request('get_state',{},20000),rpc.request('get_messages',{},20000)]);active.model=current?.model?{id:current.model.id,provider:current.model.provider,name:current.model.name}:null;state.busy=Boolean(current?.isStreaming);const preferred=getPreferredModel();if(preferred&&!state.busy&&(active.model?.id!==preferred.id||active.model?.provider!==preferred.provider)){await rpc.request('set_model',{provider:preferred.provider,modelId:preferred.id});active.model={id:preferred.id,provider:preferred.provider,name:preferred.name};}state.messages=publicMessages(messages?.messages||[]);}
   }catch(error){if(rpc)await rpc.dispose();rpc=undefined;state.error=error.message;throw error;}
   finally{loading=false;broadcast();}
  }
@@ -87,6 +89,8 @@ export async function startWebServer({projects,listSessions,readSession,makeRpc,
    if(url.pathname.startsWith('/api/')){
     if(!(req.headers.cookie||'').split(';').some(v=>v.trim()===`${cookie}=${token}`)){reply(401,{error:'Откройте веб-интерфейс кнопкой в pi.'});return;}
     if(req.method==='GET'&&url.pathname==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write('data: '+JSON.stringify(snapshot())+'\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
+    if(req.method==='GET'&&url.pathname==='/api/billing'){reply(200,billing?.snapshot()||{});return;}
+    if(req.method==='GET'&&url.pathname==='/api/offers'){if(!billing)throw Error('Пополнение не подключено.');reply(200,await billing.offers());return;}
     if(req.method==='GET'&&url.pathname==='/api/catalog'){reply(200,{projects:await catalog()});return;}
     if(req.method==='GET'&&url.pathname==='/api/models'){reply(200,{models:models().map(m=>({id:m.id,name:m.name||m.id,provider:m.provider}))});return;}
    if(req.method==='GET'&&url.pathname==='/api/browse-folders'){
@@ -124,6 +128,8 @@ export async function startWebServer({projects,listSessions,readSession,makeRpc,
    }
     if(req.method!=='POST'){reply(404,{error:'Неизвестное действие.'});return;}
     const data=await body(req),action=url.pathname.slice(5);
+    if(action==='buy'){if(!billing)throw Error('Пополнение не подключено.');reply(200,await billing.buy(data));return;}
+    if(action==='order'){if(!billing)throw Error('Пополнение не подключено.');reply(200,await billing.order(data.id));return;}
     if(action==='attach-project'){ensureIdle();navigating=true;try{
    let path=data.path?resolve(String(data.path)):null;
    if(!path&&pickProjectFolder)path=await pickProjectFolder();
@@ -160,13 +166,13 @@ export async function startWebServer({projects,listSessions,readSession,makeRpc,
     if(action==='answer'){const q=state.questions.find(q=>q.id===data.id);if(!q)throw new Error('Запрос уже закрыт.');rpc.respond({id:q.id,...(data.cancelled?{cancelled:true}:q.method==='confirm'?{confirmed:data.confirmed===true}:{value:String(data.value||'')})});state.questions=state.questions.filter(q=>q!==q);changed();reply(200,{ok:true});return;}
     reply(404,{error:'Неизвестное действие.'});return;
    }
-   const assets={'/':['web/index.html','text/html'],'/app.js':['web/app.js','text/javascript'],'/app.css':['web/app.css','text/css']},asset=assets[url.pathname];
+   const assets={'/':['web/index.html','text/html'],'/app.js':['web/app.js','text/javascript'],'/app.css':['web/app.css','text/css'],'/billing-ui.js':['web/billing-ui.js','text/javascript']},asset=assets[url.pathname];
    if(req.method!=='GET'||!asset){reply(404,{error:'Страница не найдена.'});return;}
    res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8'});res.end(await readFile(fileURLToPath(new URL(asset[0],import.meta.url))));
   }catch(error){if(!res.headersSent)reply(400,{error:error.message});else res.end();}
  });
  const heartbeat=setInterval(()=>{for(const res of clients)res.write(': heartbeat\n\n');state.questions=state.questions.filter(q=>!q.expires||q.expires>Date.now());},15000);heartbeat.unref();
- async function close(){if(disposed)return;disposed=true;generation++;unsub?.();if(voiceOwned)voice?.cancel();clearInterval(heartbeat);clearTimeout(publishTimer);for(const client of clients)client.end();clients.clear();server.close();server.closeIdleConnections?.();await rpc?.dispose();}
+ async function close(){if(disposed)return;disposed=true;generation++;unsub?.();unsubBilling?.();if(voiceOwned)voice?.cancel();clearInterval(heartbeat);clearTimeout(publishTimer);for(const client of clients)client.end();clients.clear();server.close();server.closeIdleConnections?.();await rpc?.dispose();}
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});origin=`http://127.0.0.1:${server.address().port}`;
  return {url:origin+'/#'+token,origin,close,get closed(){return disposed;}};
 }

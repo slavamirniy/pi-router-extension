@@ -17,18 +17,21 @@ export async function prepareFriendly(settings, configDir, source = bundle) {
     contents.set(file, data);
   }
   const pkg = JSON.parse(contents.get('package.json'));
-  if (pkg.name !== 'pi-friendly' || !contents.has('index.ts')) throw new Error('Invalid UI bundle');
+  if (pkg.name !== 'pi-friendly' || pkg.version !== manifest.version || !contents.has('index.ts') || !manifest.embeddedRouter || !contents.has('router/index.ts')) throw new Error('Invalid UI bundle');
 
   async function isFriendly(entry) {
     const value = typeof entry === 'string' ? entry : entry?.source;
     if (typeof value !== 'string') return false;
+    if (/^(?:git:)?(?:https:\/\/)?github\.com\/slavamirniy\/pi-router-extension(?:\.git)?(?:@[^\s]+)?\/?$/.test(value)) return true;
+    if (/^(?:git\+https:\/\/|git@)github\.com[:/]slavamirniy\/pi-router-extension(?:\.git)?(?:#[^\s]+)?$/.test(value)) return true;
     if (/^(?:git:)?(?:https:\/\/)?github\.com\/slavamirniy\/pi-friendly(?:\.git)?(?:@[^\s]+)?\/?$/.test(value)) return true;
     if (/^(?:git\+https:\/\/|git@)github\.com[:/]slavamirniy\/pi-friendly(?:\.git)?(?:#[^\s]+)?$/.test(value)) return true;
     const expanded = value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
     // Relative package paths in pi settings are relative to the agent directory.
     let directory = path.resolve(configDir, expanded);
     if (/\.(ts|js|mjs)$/.test(directory)) directory = path.dirname(directory);
-    try { return JSON.parse(await fs.readFile(path.join(directory, 'package.json'), 'utf8')).name === 'pi-friendly'; }
+    if (directory === path.join(configDir, 'extensions', 'llmsrouter-progress')) return true;
+    try { return ['pi-friendly', 'pi-router-extension'].includes(JSON.parse(await fs.readFile(path.join(directory, 'package.json'), 'utf8')).name); }
     catch { return false; }
   }
   for (const key of ['packages', 'extensions']) {
@@ -39,20 +42,29 @@ export async function prepareFriendly(settings, configDir, source = bundle) {
     }
   }
 
-  return async function install(stamp) {
+  const install = async function install(stamp) {
     const destination = path.join(configDir, 'extensions', 'pi-friendly');
     const staging = path.join(configDir, `.pi-friendly-stage-${stamp}`);
     const saved = path.join(configDir, 'backups', `pi-friendly-${stamp}`);
+    const oldQuota = path.join(configDir, 'extensions', 'llmsrouter-progress');
+    const savedQuota = path.join(configDir, 'backups', `llmsrouter-progress-${stamp}`);
     await fs.mkdir(staging, {recursive:true, mode:0o700});
     let moved = false;
+    let quotaMoved = false;
     try {
       for (const [file, data] of contents) { await fs.mkdir(path.dirname(path.join(staging,file)), {recursive:true,mode:0o700}); await fs.writeFile(path.join(staging, file), data, {mode:0o600}); }
       await fs.copyFile(path.join(source, 'bundle.json'), path.join(staging, 'bundle.json'));
       await fs.mkdir(path.dirname(destination), {recursive:true, mode:0o700});
       await fs.mkdir(path.dirname(saved), {recursive:true, mode:0o700});
+      try { await fs.rename(oldQuota, savedQuota); quotaMoved = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
       try { await fs.rename(destination, saved); moved = true; } catch (error) { if (error.code !== 'ENOENT') throw error; }
       try { await fs.rename(staging, destination); }
       catch (error) { if (moved) await fs.rename(saved, destination); throw error; }
+    } catch (error) {
+      if (quotaMoved) await fs.rename(savedQuota, oldQuota);
+      throw error;
     } finally { await fs.rm(staging, {recursive:true, force:true}); }
   };
+  install.version = pkg.version;
+  return install;
 }

@@ -11,7 +11,7 @@ test('fresh install discovers arbitrary API metadata and installs every plugin m
  assert.equal(request.url,'https://different.example/proxy/v1/models');assert.equal(request.init.redirect,'error');assert.equal(request.init.headers.Authorization,'Bearer synthetic-only');
  const config=JSON.parse(await fs.readFile(path.join(dir,'models.json'),'utf8'));
  assert.equal(config.providers.anything.models[0].contextWindow,262144);assert.equal(result.models,1);
- for(const file of ['index.ts','progress.mjs','models.mjs','safety.mjs']) assert.ok((await fs.stat(path.join(dir,'extensions','llmsrouter-progress',file))).size);
+ for(const file of ['index.ts','progress.mjs','models.mjs','safety.mjs']) assert.ok((await fs.stat(path.join(dir,'extensions','pi-friendly','router',file))).size);
  assert.equal(JSON.parse(await fs.readFile(path.join(dir,'settings.json'),'utf8')).defaultModel,'my-text');
 });
 test('reinstall replaces this provider models and preserves other providers, settings, backups and offline snapshots',async t=>{
