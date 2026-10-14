@@ -13,7 +13,7 @@ TASK_PROVIDER="${PI_PROVIDER_NAME:-router}"
 TASK_DEFAULT_MODEL="${PI_DEFAULT_MODEL:-}"
 TASK_CONFIG_DIR="${PI_CODING_AGENT_DIR:-}"
 unset PI_API_KEY PI_BASE_URL PI_PROVIDER_NAME PI_DEFAULT_MODEL
-TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/b6e01e787aac664f891bf115de92df27470f3241"
+TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/8f261faba5d99428c5a8837f8256c49854b4d98c"
 [[ -n "$TASK_BASE_URL" ]] || { echo 'Set PI_BASE_URL to your API address, including /v1.' >&2; exit 1; }
 RED='\033[0;31m'
 GREEN='\033[0;32m'

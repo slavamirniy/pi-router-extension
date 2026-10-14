@@ -18,7 +18,7 @@ $TaskProvider = if ($env:PI_PROVIDER_NAME) { $env:PI_PROVIDER_NAME } else { 'rou
 $TaskDefault = $env:PI_DEFAULT_MODEL
 $TaskConfigDir = $env:PI_CODING_AGENT_DIR
 Remove-Item Env:PI_API_KEY,Env:PI_BASE_URL,Env:PI_PROVIDER_NAME,Env:PI_DEFAULT_MODEL -ErrorAction SilentlyContinue
-$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/b6e01e787aac664f891bf115de92df27470f3241'
+$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/8f261faba5d99428c5a8837f8256c49854b4d98c'
 if ([string]::IsNullOrWhiteSpace($TaskBase)) { throw 'Set PI_BASE_URL to your API address, including /v1.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 function Write-Ok([string]$Message) {
