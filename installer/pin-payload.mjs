@@ -6,7 +6,7 @@ const root = new URL('../', import.meta.url);
 const revision = process.argv[2];
 if (!/^[0-9a-f]{40}$/.test(revision ?? '')) throw Error('Pass the public payload commit SHA');
 const bundle = JSON.parse((await fs.readFile(new URL('installer/pi-friendly/bundle.json', root), 'utf8')).replace(/^\uFEFF/, ''));
-const files = ['index.ts','models.mjs','progress.mjs','safety.mjs','installer/configure.mjs','installer/friendly.mjs','installer/pi-friendly/bundle.json', ...Object.keys(bundle.files).map(f=>'installer/pi-friendly/'+f)];
+const files = ['index.ts','models.mjs','progress.mjs','safety.mjs','installer/configure.mjs','installer/friendly.mjs', ...['index.ts','update.mjs','worker.mjs','trust.mjs'].map(f=>'installer/autoupdate/'+f),'installer/pi-friendly/bundle.json', ...Object.keys(bundle.files).map(f=>'installer/pi-friendly/'+f)];
 const entries = await Promise.all(files.map(async f=>[f,createHash('sha256').update(await fs.readFile(new URL(f,root))).digest('hex')]));
 const source = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/'+revision;
 for (const [name, shell] of [['install-pi-windows.ps1','powershell'],['install-pi-linux.sh','bash']]) {

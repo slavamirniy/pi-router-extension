@@ -50,7 +50,7 @@ test('upgrade from separate quota and old UI replaces runtime and backs up both 
   const settings = JSON.parse(await fs.readFile(path.join(dir,'settings.json'),'utf8'));
   assert.deepEqual(settings.packages,[]); assert.deepEqual(settings.extensions,[]);
   assert.equal(JSON.parse(await fs.readFile(path.join(oldUI,'package.json'),'utf8')).version,'0.12.4');
-  assert.ok((await fs.readFile(path.join(oldUI,'index.ts'),'utf8')).includes("import routerProgress from './router/index.ts'"));
+  assert.ok((await fs.readFile(path.join(oldUI,'bundled.ts'),'utf8')).includes("import routerProgress from './router/index.ts'"));
   assert.ok((await fs.stat(path.join(oldUI,'router/progress.mjs'))).size);
   const backups = await fs.readdir(path.join(dir,'backups'));
   for (const [name,text] of [['pi-friendly','old UI'],['llmsrouter-progress','old quota']]) {

@@ -19,6 +19,13 @@ export async function prepareFriendly(settings, configDir, source = bundle) {
   const pkg = JSON.parse(contents.get('package.json'));
   if (pkg.name !== 'pi-friendly' || pkg.version !== manifest.version || !contents.has('index.ts') || !manifest.embeddedRouter || !contents.has('router/index.ts')) throw new Error('Invalid UI bundle');
 
+  // Install a stable loader once. Background updates only publish immutable
+  // runtime versions, never overwrite this loader or the bundled fallback.
+  contents.set('bundled.ts', contents.get('index.ts'));
+  for (const file of ['index.ts','update.mjs','worker.mjs','trust.mjs']) {
+    contents.set(file, await fs.readFile(new URL('./autoupdate/'+file, import.meta.url)));
+  }
+
   async function isFriendly(entry) {
     const value = typeof entry === 'string' ? entry : entry?.source;
     if (typeof value !== 'string') return false;
