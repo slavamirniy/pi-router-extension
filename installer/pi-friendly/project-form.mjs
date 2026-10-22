@@ -3,11 +3,11 @@ import {buttonRows,navigationRows} from './buttons.mjs';
 import {mouseEvent,clean} from './menu.mjs';
 import {acquireMouse} from './mouse.mjs';
 import {validateProjectName} from './projects.mjs';
-export function createProjectForm({tui,done,palette:p,makeInput,truncate,measure,matchesKey,sliceByColumn}){
- const input=makeInput();input.focused=true;let pointer;let error='',focus=0,targets=[],size='',disposed=false;
+export function createProjectForm({tui,done,palette:p,makeInput,truncate,measure,matchesKey,sliceByColumn,title="Новый проект",subtitle="Будет создана отдельная папка.",label="Название проекта",hint="Например: Сайт пекарни",submitLabel="Создать проект",validate=validateProjectName,initial=""}){
+ const input=makeInput();input.setValue?.(initial);input.focused=true;let pointer;let error='',focus=0,targets=[],size='',disposed=false;
  const release=acquireMouse(tui.terminal);
  const close=value=>{if(disposed)return;disposed=true;release();done(value);};
- const submit=()=>{try{close(validateProjectName(input.getValue()));}catch(e){error=e.message;tui.requestRender();}};
+ const submit=()=>{try{close(validate(input.getValue()));}catch(e){error=e.message;tui.requestRender();}};
  input.onSubmit=submit;input.onEscape=()=>close(undefined);
  return {dispose(){if(!disposed){disposed=true;release();}},invalidate(){input.invalidate?.();},render(width){
   const h=tui.terminal.rows;size=`${tui.terminal.columns}:${h}`;targets=[];
@@ -16,17 +16,17 @@ export function createProjectForm({tui,done,palette:p,makeInput,truncate,measure
   const put=(y,s,bg=p.canvas,fg=p.text)=>{if(y>=0&&y<h)rows[y]=paint('',left)+paint(s,w,bg,fg)+paint('',Math.max(0,width-left-w));};
   if(h<14||width<26){put(1,'Увеличьте окно · Esc — отмена');return hoverRows(rows,targets,pointer,sliceByColumn,measure);}
   const top=Math.max(3,h-12);
-  put(top,'Новый проект',p.canvas,p.accent);
-  put(top+1,'Будет создана отдельная папка.',p.canvas,p.muted);
-  put(top+3,'Название проекта');
+  put(top,title,p.canvas,p.accent);
+  put(top+1,subtitle,p.canvas,p.muted);
+  put(top+3,label);
   put(top+4,'╭'+'─'.repeat(w-2)+'╮',p.canvas,focus===0?p.accent:p.border);
   put(top+5,'│ '+input.render(w-4)[0]+' │',p.sidebar);
   put(top+6,'╰'+'─'.repeat(w-2)+'╯',p.canvas,focus===0?p.accent:p.border);
-  put(top+7,error?'Название: до 60 символов, без / \\ : * ?':'Например: Сайт пекарни',p.canvas,error?p.error:p.muted);
+  put(top+7,error||hint,p.canvas,error?p.error:p.muted);
   const y=top+8,half=Math.floor((w-2)/2);
-  const primary=buttonRows('Создать проект',half,truncate,measure),secondary=buttonRows('Отмена',w-half-2,truncate,measure);
+  const primary=buttonRows(submitLabel,half,truncate,measure),secondary=buttonRows('Отмена',w-half-2,truncate,measure);
   for(let n=0;n<3;n++)rows[y+n]=paint('',left)+paint(primary[n],half,p.accent,p.onAccent)+paint('',2)+paint(secondary[n],w-half-2,focus===2?p.selection:p.button,focus===2?p.accent:p.text)+paint('',width-left-w);
-  if(focus===1)rows[y+1]=rows[y+1].replace('Создать проект','\x1b[1mСоздать проект\x1b[22m');
+  if(focus===1)rows[y+1]=rows[y+1].replace(submitLabel,'\x1b[1m'+submitLabel+'\x1b[22m');
   targets=[{x:left,y:top+4,w,h:3,run:()=>{focus=0;input.focused=true;}},{x:left,y,w:half,h:3,run:submit},{x:left+half+2,y,w:w-half-2,h:3,run:()=>close(undefined)}];
   const nav=navigationRows(width,p,truncate,measure);
   nav.rows.forEach((row,y)=>rows[y]=row);

@@ -1,13 +1,13 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
   "revision": "03dd18946c74052abd99c1314fdb794a5a0bdefe",
-  "version": "0.12.4",
+  "version": "0.12.5",
   "embeddedRouter": true,
   "files": {
     "LICENSE": "7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd",
     "activity.mjs": "a24f1ffbf7e53c3167a7fcbd0b93655ee63c46a3d506f41a8ed2fe4bdc93e3e3",
-    "billing-panel.mjs": "d50c65b2a4334fc3a1ab7432f0b09ec02f03d6b789e2447236aaa64c538d05f8",
-    "billing.mjs": "8ab7983af2a91bf17fab15543ceaf16794b3030ee5b92bab9d45fec5ae0df6b2",
+    "billing-panel.mjs": "fc3dbe35b698f0558aacf62dceb4b53fcdfaf84beb8c9e9cea8b3f2bb36b87fb",
+    "billing.mjs": "62e698e7654231d6e368e19587c739206f04261e81e799c1f6b2b57166b1a00f",
     "buttons.mjs": "db08e99863e394f573d40d2a3578b45a1eed5fa3ef255c6e0bf13ff1d8fe4993",
     "clipboard.mjs": "b46c0110745d169f4bab11b20f7c40dd82356476499ab39ebcb7983b42529aae",
     "errors.mjs": "7c8dd4288b9153c89d21dd3f91902b8052a21421776e80b6b259c84e8d439f06",
@@ -21,8 +21,8 @@
     "model-picker.mjs": "b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689",
     "model-preference.mjs": "11f3313f11cff5ebe8fe981855219de1c833100d3106c765308beec3d173f798",
     "mouse.mjs": "4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0",
-    "package.json": "7b7437dc6e733c2468faa989453e9f454989b05695768238c54efbbfb74ecdee",
-    "project-form.mjs": "b4a5b24dcceafebd0a5e2454a99cc0ce38a38f3082b395671d3c92a2f4958c57",
+    "package.json": "de5d5654c97762387ec6b33bd6bfe15b83544384638fabb8d493ddc788460c7b",
+    "project-form.mjs": "4e0479c38ae070306a8de10846c6dca60896e02aba66a4de403a56e02f7962d4",
     "projects.mjs": "a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03",
     "router/LICENSE": "7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710",
     "router/index.ts": "386c717605f57f509ef78d23781f7d0801231435c18654522f5a9fa86aa0be56",
@@ -42,8 +42,9 @@
     "web-server.mjs": "b252ac6ce715a1046f54523d6542acdd5a2f713e3876ce16c95b7bdc2e90576a",
     "web/app.css": "721759701b842deebb2f49435694fca8f76a14f766a14f5f658c5dee845b07fb",
     "web/app.js": "e0b185bfdf1851f8e1162be07fdc1403841a27cf7e3d2809043d6a0dbc2e6275",
-    "web/billing-ui.js": "be46e4f16ce5cdd0269c91948e31d41aca9583a448bce717f4e67c737d9365c9",
+    "web/billing-ui.js": "052f1a6ce519498b132b212dc407dd213b57c4dede83e2b0b3e03cbd54bc6596",
     "web/index.html": "7d95459dd55ae5c50fd702a582cd9a300133e1fcbf5c638de674b172f38940a5",
     "workspace.mjs": "25c252e02be2a8a7037d36854d6d3adcf0a833de637304e33ac9ee924a0d9329"
-  }
+  },
+  "patch": "receipt-email-checkout-20261022"
 }

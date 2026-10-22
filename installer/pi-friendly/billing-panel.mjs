@@ -1,9 +1,11 @@
+import {createProjectForm} from './project-form.mjs';
+import {receiptEmail} from './billing.mjs';
 import {randomUUID} from 'node:crypto';
 import {createMenu,clean} from './menu.mjs';
 // The pane exists before networking starts; Escape always remains available.
 export function createBillingPanel(options){
  const {billing,openExternal=()=>{},done,tui}=options;
- let inner,closed=false,epoch=0,timer,offers=[],selected,offerConsent=false,personalConsent=false,requestId;
+ let inner,closed=false,epoch=0,timer,offers=[],selected,offerConsent=false,personalConsent=false,requestId,email='';
  const tokens=n=>Number.isFinite(Number(n))?Math.max(0,Number(n)).toLocaleString('ru-RU')+' токенов':'Баланс уточняется';
  const balance=()=>{const b=billing.snapshot();return b.account?'Доступно: '+tokens(b.account.available):'Баланс пока неизвестен';};
  const price=o=>(o.price_kopecks/100).toLocaleString('ru-RU')+' ₽';
@@ -19,6 +21,7 @@ export function createBillingPanel(options){
  function checkout(){show('Пополнить · '+price(selected),summary(selected),[
   {id:'offer',label:(offerConsent?'[x] ':'[ ] ')+'Принимаю оферту',description:'И ознакомился с политикой конфиденциальности'},
   {id:'personal',label:(personalConsent?'[x] ':'[ ] ')+'Согласие на обработку ПД',description:'Отдельное согласие на персональные данные'},
+  {id:'email',label:email?'Email для чека: '+email:'Указать email для чека'},
   {id:'docs',label:'Прочитать документы'},
   {id:'pay',label:'Перейти к оплате · '+price(selected),description:offerConsent&&personalConsent?(test?'Тестовая оплата · CloudPayments':'Защищённая страница CloudPayments'):'Сначала отметьте оба согласия'},
   {id:'plans',label:'Другой пакет',description:balance()}
@@ -34,7 +37,8 @@ export function createBillingPanel(options){
   if(item.id==='docs'){show('Документы оплаты','Откроются в браузере',[{id:'doc',key:'offer',label:'Оферта'},{id:'doc',key:'privacy',label:'Политика конфиденциальности'},{id:'doc',key:'consent',label:'Согласие на обработку ПД'},{id:'checkout',label:'Вернуться к оплате'}]);return;}
   if(item.id==='doc'){await openExternal(billing.snapshot().legal[item.key].url);checkout();return;}
   if(item.id==='checkout'){checkout();return;}
-  if(item.id==='pay'){if(!offerConsent||!personalConsent){checkout();return;}return pending('Готовлю страницу оплаты…',()=>billing.buy({plan:selected.plan_id,id:requestId,consent:{offer:true,personalData:true,versions:Object.fromEntries(Object.entries(billing.snapshot().legal).map(([k,v])=>[k,v.version]))}}),order=>{show('Страница оплаты готова',summary(selected),[{id:'open',url:order.checkout_url,label:'Открыть оплату · '+price(selected),description:'Оплата в браузере на CloudPayments'}]);},'pay');}
+  if(item.id==='email'||item.id==='pay'&&!email){inner?.dispose();inner=createProjectForm({...options,title:'Email для чека',subtitle:'На этот адрес придёт кассовый чек.',label:'Email',hint:'Например: name@example.com',submitLabel:'Продолжить',validate:receiptEmail,initial:email,done:value=>{if(closed)return;if(value&&value!==email){email=value;requestId=randomUUID();}checkout();}});tui.requestRender();return;}
+  if(item.id==='pay'){if(!offerConsent||!personalConsent){checkout();return;}return pending('Готовлю страницу оплаты…',()=>billing.buy({plan:selected.plan_id,id:requestId,email,consent:{offer:true,personalData:true,versions:Object.fromEntries(Object.entries(billing.snapshot().legal).map(([k,v])=>[k,v.version]))}}),order=>{show('Страница оплаты готова',summary(selected),[{id:'open',url:order.checkout_url,label:'Открыть оплату · '+price(selected),description:'Оплата в браузере на CloudPayments'}]);},'pay');}
   if(item.id==='open'){await openExternal(item.url);show('Оплата открыта в браузере',balance(),[{id:'refresh',label:'Обновить баланс'}]);return;}
   if(item.id==='refresh')return pending('Обновляю баланс…',()=>billing.refresh(),()=>catalogue(),'refresh');
  }catch(e){show('Не удалось открыть действие',clean(e.message),[{id:selected?'checkout':'reload',label:'Попробовать снова'}]);}}
