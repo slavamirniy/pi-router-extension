@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
   "revision": "03dd18946c74052abd99c1314fdb794a5a0bdefe",
-  "version": "0.12.5",
+  "version": "0.12.6",
   "embeddedRouter": true,
   "files": {
     "LICENSE": "7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd",
@@ -21,7 +21,7 @@
     "model-picker.mjs": "b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689",
     "model-preference.mjs": "11f3313f11cff5ebe8fe981855219de1c833100d3106c765308beec3d173f798",
     "mouse.mjs": "4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0",
-    "package.json": "de5d5654c97762387ec6b33bd6bfe15b83544384638fabb8d493ddc788460c7b",
+    "package.json": "1aea4441f0253501a2c9098ecc0bdd69403bd56af812c6ca4afb6478a916d827",
     "project-form.mjs": "4e0479c38ae070306a8de10846c6dca60896e02aba66a4de403a56e02f7962d4",
     "projects.mjs": "a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03",
     "router/LICENSE": "7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710",
@@ -40,11 +40,11 @@
     "web-messages.mjs": "6677630d0619fa294f1a92373c20231d2b04ed234a5bb249620f416ab91a533b",
     "web-rpc.mjs": "495309052bfc3016a397cb32da788968fc428bc6d9cad3e9bf9b1618458b857f",
     "web-server.mjs": "b252ac6ce715a1046f54523d6542acdd5a2f713e3876ce16c95b7bdc2e90576a",
-    "web/app.css": "721759701b842deebb2f49435694fca8f76a14f766a14f5f658c5dee845b07fb",
+    "web/app.css": "0d8f1eacc5d1c2de88f821f8a959dcc7d2a2b72d13fb8dcf591811d7a0b81af0",
     "web/app.js": "e0b185bfdf1851f8e1162be07fdc1403841a27cf7e3d2809043d6a0dbc2e6275",
-    "web/billing-ui.js": "052f1a6ce519498b132b212dc407dd213b57c4dede83e2b0b3e03cbd54bc6596",
+    "web/billing-ui.js": "ec1d1f143d2ae2ee607670fd41faf269b9eb984ac2f3c561378606aa75cc9df5",
     "web/index.html": "7d95459dd55ae5c50fd702a582cd9a300133e1fcbf5c638de674b172f38940a5",
     "workspace.mjs": "25c252e02be2a8a7037d36854d6d3adcf0a833de637304e33ac9ee924a0d9329"
   },
-  "patch": "receipt-email-checkout-20261022"
+  "patch": "billing-email-layout-20261025"
 }
