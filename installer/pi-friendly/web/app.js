@@ -1,3 +1,4 @@
+import {inlineParts} from './links.mjs';
 import {createBillingUI} from './billing-ui.js';
 const billingUI=createBillingUI();
 const $=id=>document.getElementById(id);
@@ -127,7 +128,7 @@ $('file-input').onchange=()=>task(async()=>{
  }finally{uploading=false;renderStatus();}
 });
 /* ---------- Сообщения ---------- */
-function inline(parent,text){const re=/(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^\s)]+\))/g;let last=0;for(const match of text.matchAll(re)){parent.append(document.createTextNode(text.slice(last,match.index)));const t=match[0];if(t.startsWith('`'))parent.append(el('code',t.slice(1,-1)));else if(t.startsWith('**'))parent.append(el('strong',t.slice(2,-2)));else{const [,name,url]=/^\[([^\]]+)\]\(([^)]+)\)$/.exec(t);const a=el('a',name);a.href=url;a.target='_blank';a.rel='noopener noreferrer';parent.append(a);}last=match.index+t.length;}parent.append(document.createTextNode(text.slice(last)));}
+function inline(parent,text){for(const part of inlineParts(text)){if(part.type==='text')parent.append(document.createTextNode(part.text));else if(part.type==='link'){const a=el('a',part.text);a.href=part.url;a.target='_blank';a.rel='noopener noreferrer';parent.append(a);}else{const node=el(part.type);if(part.type==='strong')inline(node,part.text);else node.textContent=part.text;parent.append(node);}}}
 function markdown(parent,text){
  let code=null,paragraph=[],list=null;
  const flush=()=>{if(paragraph.length){const p=el('p');inline(p,paragraph.join('\n'));parent.append(p);paragraph=[];}};

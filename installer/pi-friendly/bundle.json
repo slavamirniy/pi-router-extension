@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
   "revision": "03dd18946c74052abd99c1314fdb794a5a0bdefe",
-  "version": "0.12.6",
+  "version": "0.12.7",
   "embeddedRouter": true,
   "files": {
     "LICENSE": "7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd",
@@ -15,13 +15,13 @@
     "folder-picker.mjs": "0e1bbc47354a8c28e4f1bb08dab97bad39a3518f5b2e2c84dcd0ac2e3d6f5f4e",
     "friendly.mjs": "b0a81ed67b763c46985fa7444b0a1b1d77d1e6d7b88d526e2159d67a72666c5c",
     "hover.mjs": "1e7a997b044de13322ef46b2332ed010c1e630ad161ef7bc3cd94b2bc5dcad48",
-    "index.ts": "bcb1128593fe5c3855ce44ff4e8b2bb95b3bbd29123ed91118edc324fb9e0b5b",
+    "index.ts": "1c1dbceeb9085fd0826e5b84d8724cca3759f43e5f7c74d6f1ab1d7820b05094",
     "legal.mjs": "4863b553ef2e4ac9717093be4a42411522d15520a7d9e2d54a8ae66afe1dc938",
     "menu.mjs": "9ca8cadc393640c5b8982db2348ed6afa188875d02b8e8fb9a5e1c5deb766c19",
     "model-picker.mjs": "b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689",
     "model-preference.mjs": "11f3313f11cff5ebe8fe981855219de1c833100d3106c765308beec3d173f798",
     "mouse.mjs": "4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0",
-    "package.json": "1aea4441f0253501a2c9098ecc0bdd69403bd56af812c6ca4afb6478a916d827",
+    "package.json": "df0f5e3ca6bd620e35fad042b177081064b8a9e591726ab5fc6bfdce71f92081",
     "project-form.mjs": "4e0479c38ae070306a8de10846c6dca60896e02aba66a4de403a56e02f7962d4",
     "projects.mjs": "a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03",
     "router/LICENSE": "7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710",
@@ -30,7 +30,7 @@
     "router/progress.mjs": "baca4338904c5050d16433d4ca83c6677775b1d9746cc599a42325695df191c0",
     "router/safety.mjs": "76bdeccad825b281882456f7d69a7352b964f5df1dc6ab969b0b2301c2c135ba",
     "selection.mjs": "38dfe2e4073550980a7b985e14e9a57ca16f0f8264ff4642578df3b8a077249a",
-    "surface.mjs": "d56af4cdeb0afc5f7f198c4c2902004dcd606181d62780bccd291807661121ad",
+    "surface.mjs": "5741fa1ed7e348cdc071a3e059bcf831c9c012e95ece3574f6652fe014deaf45",
     "uploads.mjs": "618b6823070e88c842fe6269f662e46e2bf16a61200ccfd32c9cb9bfd92a36c2",
     "voice-setup.mjs": "d880ed57c78da937f911d7c62eefc71115f0daa21c373335f9cbb568ef29b900",
     "voice-worker.py": "fdec70d83c8a7d20a630cb0647e828157f6ce86767a3d566d97ed66e9288c44b",
@@ -39,12 +39,13 @@
     "web-host.mjs": "858a9ce030934bddc4da6f88759137232eb8a334a9d8f42271e900318d35cb59",
     "web-messages.mjs": "6677630d0619fa294f1a92373c20231d2b04ed234a5bb249620f416ab91a533b",
     "web-rpc.mjs": "495309052bfc3016a397cb32da788968fc428bc6d9cad3e9bf9b1618458b857f",
-    "web-server.mjs": "b252ac6ce715a1046f54523d6542acdd5a2f713e3876ce16c95b7bdc2e90576a",
+    "web-server.mjs": "3c47e61971af03b190a67247b245df30d18fadbeb6680d9f1aacb0f90a9a6d46",
     "web/app.css": "0d8f1eacc5d1c2de88f821f8a959dcc7d2a2b72d13fb8dcf591811d7a0b81af0",
-    "web/app.js": "e0b185bfdf1851f8e1162be07fdc1403841a27cf7e3d2809043d6a0dbc2e6275",
+    "web/app.js": "a56ed00af0e86a74d0c0b24c7cca8d2530a9085a6122654c669647b03f195d8e",
     "web/billing-ui.js": "ec1d1f143d2ae2ee607670fd41faf269b9eb984ac2f3c561378606aa75cc9df5",
     "web/index.html": "7d95459dd55ae5c50fd702a582cd9a300133e1fcbf5c638de674b172f38940a5",
-    "workspace.mjs": "25c252e02be2a8a7037d36854d6d3adcf0a833de637304e33ac9ee924a0d9329"
+    "workspace.mjs": "25c252e02be2a8a7037d36854d6d3adcf0a833de637304e33ac9ee924a0d9329",
+    "web/links.mjs": "cc2ce771894e8323c67128037d1cdadaeb22327a86754bcbe992fc85685590e8"
   },
-  "patch": "billing-email-layout-20261025"
+  "patch": "clickable-web-cli-links-20261025"
 }

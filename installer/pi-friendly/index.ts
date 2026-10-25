@@ -1,3 +1,4 @@
+import {safeLink,safeTerminalLinks} from './web/links.mjs';
 import routerProgress from './router/index.ts';
 import {createBilling} from './billing.mjs';
 import {pickProjectFolder} from './folder-picker.mjs';
@@ -9,7 +10,7 @@ import {spawn} from 'node:child_process';
 import {readClipboardText} from './clipboard.mjs';
 import { createVoiceService } from './voice.mjs';
 import { copyToClipboard, CustomEditor, SessionManager, getAgentDir, getPackageDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Input, Markdown, sliceByColumn, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { getCapabilities, setCapabilities, getOsc8LinkAtColumn, Input, Markdown, sliceByColumn, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { createProjectStore } from "./projects.mjs";
@@ -25,7 +26,7 @@ export default function friendly(pi: ExtensionAPI) {
   pi.on('session_start',async(_event,ctx)=>{billingContext=ctx;if(ctx.mode!=='tui')return;void billing.refresh();clearInterval(billingTimer);billingTimer=setInterval(()=>void billing.refresh(),30000);billingTimer.unref?.();});
   pi.on('agent_end',()=>{void billing.refresh();});
   pi.on('session_shutdown',()=>{clearInterval(billingTimer);billing.dispose();});
-  const openExternal=(url:string)=>{const c=process.platform==='win32'?spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{windowsHide:true,stdio:'ignore'}):spawn(process.platform==='darwin'?'open':'xdg-open',[url],{stdio:'ignore'});c.on('error',()=>{});c.unref();};
+  const openExternal=(url:string)=>{const valid=safeLink(url);if(!valid)return;url=valid;const c=process.platform==='win32'?spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{windowsHide:true,stdio:'ignore'}):spawn(process.platform==='darwin'?'open':'xdg-open',[url],{stdio:'ignore'});c.on('error',()=>{});c.unref();};
   const modelPreference=createModelPreference(join(getAgentDir(),'friendly-model.json'));
   pi.on('model_select',(event)=>{if(event.source!=='restore')modelPreference.save(event.model);});
   pi.on('session_start',async(_event,ctx)=>{const model=modelPreference.resolve(ctx.modelRegistry.getAvailable());if(model)await pi.setModel(model);});
@@ -56,7 +57,7 @@ export default function friendly(pi: ExtensionAPI) {
     ctx.ui.notify('Веб-интерфейс открыт в браузере. Оставьте pi запущенным.','info');
   };
   pi.on('session_shutdown',async()=>{await web?.close();web=undefined;unlockTerminal?.();unlockTerminal=undefined;});
-  installFriendly(pi, { billing,openExternal,openWeb, isWebActive:()=>Boolean(web&&!web.closed), copyToClipboard, readClipboardText, sliceByColumn, matchesKey, truncate: truncateToWidth, measure: visibleWidth,
+  installFriendly(pi, { billing,openExternal,linkAt:getOsc8LinkAtColumn,openWeb, isWebActive:()=>Boolean(web&&!web.closed), copyToClipboard, readClipboardText, sliceByColumn, matchesKey, truncate: truncateToWidth, measure: visibleWidth,
     makeInput: () => new Input(),
     createVoice: callbacks => createVoiceService({root:join(getAgentDir(),'friendly-voice'),...callbacks}),
     makeEditor: (tui, theme, keys) => new CustomEditor(tui, theme, keys),
@@ -67,12 +68,15 @@ export default function friendly(pi: ExtensionAPI) {
     markdown: (text, width, palette) => {
       const color = value => s => `\x1b[38;2;${value}m${s}\x1b[39m`;
       const accent = color(palette.accent), muted = color(palette.muted);
+      const previous=getCapabilities();
+      try { setCapabilities({...previous,hyperlinks:true});
       return new Markdown(text, 0, 0, {
         heading: accent, link: accent, linkUrl: muted, code: accent, codeBlock: s => s,
         codeBlockBorder: muted, quote: muted, quoteBorder: muted, hr: muted, listBullet: accent,
         bold: s => `\x1b[1m${s}\x1b[22m`, italic: s => `\x1b[3m${s}\x1b[23m`,
         strikethrough: s => s, underline: s => s,
-      }).render(width);
+      }).render(width).map(safeTerminalLinks);
+      } finally {setCapabilities(previous);}
     },
   });
 }

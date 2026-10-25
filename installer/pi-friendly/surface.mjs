@@ -1,3 +1,4 @@
+import {safeLink} from './web/links.mjs';
 import {editorMap,offsetAt} from './selection.mjs';
 import {centered,buttonRows} from './buttons.mjs';
 import { clean, mouseEvent } from './menu.mjs';
@@ -34,7 +35,7 @@ export function messageText(message) {
  return (message.content??[]).filter(c=>c.type==='text'||c.type==='image').map(c=>c.type==='image'?'[Прикреплено изображение]':c.text).join('\n');
 }
 export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
- let targets=[],dimensions='',scroll=0,editorRect,editorRows=[],dragAnchor,contextMenu,contextTargets=[],pointer,errorExpanded=false,lastError,errorOffset=0,errorMax=0,errorRect;
+ let linkRows=[],targets=[],dimensions='',scroll=0,editorRect,editorRows=[],dragAnchor,contextMenu,contextTargets=[],pointer,errorExpanded=false,lastError,errorOffset=0,errorMax=0,errorRect;
  const hovering=(x,y,w,h)=>pointer&&pointer.x>=x&&pointer.x<x+w&&pointer.y>=y&&pointer.y<y+h;
  const shade=bg=>bg.split(';').map(v=>Math.round(Number(v)*.9)).join(';');
  const closeContext=()=>{contextMenu=undefined;tui.requestRender();};
@@ -44,7 +45,7 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
  const safeText=text=>String(text??'').split('\n').map(clean).join('\n');
  function render(width) {
   const height=tui.terminal.rows,s=state(),p=palettes[s.scheme]??palettes.light;
-  dimensions=`${width}:${height}`;targets=[];
+  dimensions=`${width}:${height}`;targets=[];linkRows=[];
   const paint=(text,w,bg=p.canvas,fg=p.text)=>{
    const base=`\x1b[48;2;${bg}m\x1b[38;2;${fg}m`;
    const value=truncate(text,w,'');return base+value.replace(/\x1b\[(?:0)?m/g,base).replace(/\x1b\[39m/g,`\x1b[38;2;${fg}m`).replace(/\x1b\[49m/g,`\x1b[48;2;${bg}m`)+' '.repeat(Math.max(0,w-measure(value)))+'\x1b[0m';
@@ -236,7 +237,7 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
    }}
   content.slice(start,start+capacity).forEach((line,n)=>{const inset=line.inset??0,w=line.blockWidth??cw;right[3+n]=paint('',pad+inset)+paint(line.text,w,line.error?p.errorBg:line.card?(line.user?p.bubble:p.sidebar):p.canvas,line.error?p.error:line.tool?p.accent:line.muted?p.muted:p.text)+paint('',main-pad-inset-w);});
   if(scroll>0)put(2,'↑ История · прокрутите вниз к новым сообщениям',p.canvas,p.muted);
-  const frame=left.map((line,i)=>line+right[i]);contextTargets=[];
+  const frame=left.map((line,i)=>line+right[i]);linkRows=frame;contextTargets=[];
   if(contextMenu){
    const items=contextItems(),w=Math.min(24,width),x=Math.max(0,Math.min(contextMenu.x,width-w)),y=Math.max(0,Math.min(contextMenu.y-items.length-2,height-items.length-2));
    const popup=[{text:'╭'+'─'.repeat(w-2)+'╮'},...items.map((item,index)=>({text:'│ '+truncate(item.label,w-4,'')+' '.repeat(Math.max(0,w-4-measure(item.label)))+' │',index,item})),{text:'╰'+'─'.repeat(w-2)+'╯'}];
@@ -268,7 +269,7 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
   if(dragAnchor!==undefined&&(event.button===32||!event.press)){
    if(editorRect){const end=at();actions.selection?.set(dragAnchor,end);}if(!event.press)dragAnchor=undefined;tui.requestRender();return true;
   }
-  if(event.press&&event.button===0){actions.selection?.clear();const hit=targets.find(t=>event.x>=t.x&&event.x<t.x+t.w&&event.y>=t.y&&event.y<t.y+t.h);if(hit)void hit.run();}
+  if(event.press&&event.button===0){actions.selection?.clear();const hit=targets.find(t=>event.x>=t.x&&event.x<t.x+t.w&&event.y>=t.y&&event.y<t.y+t.h);if(hit)void hit.run();else {const url=safeLink(rendering.linkAt?.(linkRows[event.y]||'',event.x));if(url)rendering.openExternal?.(url);}}
   if(errorExpanded&&errorRect&&(event.button===64||event.button===65)&&event.x>=errorRect.x&&event.x<errorRect.x+errorRect.w&&event.y>=errorRect.y&&event.y<errorRect.y+errorRect.h){errorOffset=Math.max(0,Math.min(errorMax,errorOffset+(event.button===64?-3:3)));tui.requestRender();return true;}
   if(event.press&&(event.button===64||event.button===65))scroll=Math.max(0,scroll+(event.button===64?3:-3));
   tui.requestRender();return true;

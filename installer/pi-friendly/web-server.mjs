@@ -166,7 +166,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
     if(action==='answer'){const q=state.questions.find(q=>q.id===data.id);if(!q)throw new Error('Запрос уже закрыт.');rpc.respond({id:q.id,...(data.cancelled?{cancelled:true}:q.method==='confirm'?{confirmed:data.confirmed===true}:{value:String(data.value||'')})});state.questions=state.questions.filter(q=>q!==q);changed();reply(200,{ok:true});return;}
     reply(404,{error:'Неизвестное действие.'});return;
    }
-   const assets={'/':['web/index.html','text/html'],'/app.js':['web/app.js','text/javascript'],'/app.css':['web/app.css','text/css'],'/billing-ui.js':['web/billing-ui.js','text/javascript']},asset=assets[url.pathname];
+   const assets={'/':['web/index.html','text/html'],'/app.js':['web/app.js','text/javascript'],'/app.css':['web/app.css','text/css'],'/billing-ui.js':['web/billing-ui.js','text/javascript'],'/links.mjs':['web/links.mjs','text/javascript']},asset=assets[url.pathname];
    if(req.method!=='GET'||!asset){reply(404,{error:'Страница не найдена.'});return;}
    res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8'});res.end(await readFile(fileURLToPath(new URL(asset[0],import.meta.url))));
   }catch(error){if(!res.headersSent)reply(400,{error:error.message});else res.end();}

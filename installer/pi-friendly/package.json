@@ -1,6 +1,6 @@
 {
   "name": "pi-friendly",
-  "version": "0.12.6",
+  "version": "0.12.7",
   "type": "module",
   "description": "Просто pi: понятное меню с мышью и компактный интерфейс",
   "license": "MIT",
