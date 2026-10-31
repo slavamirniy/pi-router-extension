@@ -8,9 +8,10 @@ import { safeExtensionAPI } from "./safety.mjs";
 
 export default function routerProgress(pi: ExtensionAPI, options: any = {}) {
   const safePi = safeExtensionAPI(pi);
-  installModelRefresh(safePi, { loadConfigured: async () => {
+  const catalogue = installModelRefresh(safePi, { loadConfigured: async () => {
     try { return JSON.parse(await readFile(join(getAgentDir(), "models.json"), "utf8")).providers ?? {}; }
     catch { return {}; }
   }, saveConfigured: (updates, snapshot) => persistCatalogues(join(getAgentDir(), "models.json"), updates, snapshot) });
   installRouterProgress(safePi, { ...options, truncate: truncateToWidth, measure: visibleWidth });
+  return catalogue;
 }

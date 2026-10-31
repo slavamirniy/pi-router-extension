@@ -92,7 +92,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
     if(req.method==='GET'&&url.pathname==='/api/billing'){reply(200,billing?.snapshot()||{});return;}
     if(req.method==='GET'&&url.pathname==='/api/offers'){if(!billing)throw Error('Пополнение не подключено.');reply(200,await billing.offers());return;}
     if(req.method==='GET'&&url.pathname==='/api/catalog'){reply(200,{projects:await catalog()});return;}
-    if(req.method==='GET'&&url.pathname==='/api/models'){reply(200,{models:models().map(m=>({id:m.id,name:m.name||m.id,provider:m.provider}))});return;}
+    if(req.method==='GET'&&url.pathname==='/api/models'){reply(200,{models:(await models()).map(m=>({id:m.id,name:m.name||m.id,provider:m.provider}))});return;}
    if(req.method==='GET'&&url.pathname==='/api/browse-folders'){
     const start=String(url.searchParams.get('path')||'').trim()||join(homedir());
     if(!isAbsolute(start))throw new Error('Укажите полный путь.');
@@ -162,7 +162,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
      return;
     }
     if(action==='abort'){await rpc.request('abort');state.busy=false;for(const m of state.messages){if(m.status==='streaming')m.status='stopped';for(const t of m.tools)if(t.status==='running')t.status='stopped';}changed();reply(200,{ok:true});return;}
-    if(action==='model'){ensureIdle();const model=models().find(m=>m.id===data.id&&m.provider===data.provider);if(!model)throw new Error('Модель недоступна.');await rpc.request('set_model',{provider:model.provider,modelId:model.id});onModelSelected(model);active.model={id:model.id,name:model.name,provider:model.provider};changed();reply(200,{ok:true});return;}
+    if(action==='model'){ensureIdle();const model=(await models()).find(m=>m.id===data.id&&m.provider===data.provider);if(!model)throw new Error('Модель недоступна.');await rpc.request('set_model',{provider:model.provider,modelId:model.id});onModelSelected(model);active.model={id:model.id,name:model.name,provider:model.provider};changed();reply(200,{ok:true});return;}
     if(action==='answer'){const q=state.questions.find(q=>q.id===data.id);if(!q)throw new Error('Запрос уже закрыт.');rpc.respond({id:q.id,...(data.cancelled?{cancelled:true}:q.method==='confirm'?{confirmed:data.confirmed===true}:{value:String(data.value||'')})});state.questions=state.questions.filter(q=>q!==q);changed();reply(200,{ok:true});return;}
     reply(404,{error:'Неизвестное действие.'});return;
    }

@@ -34,7 +34,7 @@ export default function friendly(pi: ExtensionAPI) {
   const projects=createProjectStore({root:join(homedir(),"Documents","AI DIY Projects"),registry:join(getAgentDir(),"friendly-projects.jsonl"),SessionManager});
   let web: any, opening: Promise<any> | undefined, unlockTerminal: (()=>void) | undefined;
   const hostObservers=new Set<(event:any)=>void>();
-  routerProgress(pi,{onSnapshot:(progress:any,ctx:any)=>{const event={type:'friendly_router_progress',progress};if(process.env.PI_FRIENDLY_WEB_CHILD==='1'&&ctx?.mode==='rpc')process.stderr.write('PI_FRIENDLY_PROGRESS '+JSON.stringify(event)+'\n');else for(const emit of hostObservers)emit(event);}});
+  const catalogue = routerProgress(pi,{onSnapshot:(progress:any,ctx:any)=>{const event={type:'friendly_router_progress',progress};if(process.env.PI_FRIENDLY_WEB_CHILD==='1'&&ctx?.mode==='rpc')process.stderr.write('PI_FRIENDLY_PROGRESS '+JSON.stringify(event)+'\n');else for(const emit of hostObservers)emit(event);}});
   for(const type of ['agent_start','agent_end','agent_settled','message_start','message_update','message_end','tool_execution_start','tool_execution_update','tool_execution_end'] as const)pi.on(type,(event:any)=>{for(const emit of hostObservers)emit(event);});
   const openWeb=async(ctx: any, voice: any, getHostStatuses: any=()=>[])=>{
     if(process.env.PI_FRIENDLY_WEB_CHILD==='1')return;
@@ -44,7 +44,7 @@ export default function friendly(pi: ExtensionAPI) {
       opening??=startWebServer({billing,projects,listSessions:()=>SessionManager.listAll(),readSession:(path: string)=>SessionManager.open(path).buildSessionContext().messages,
         makeHostRpc:({onEvent}:any)=>createHostBridge({pi,ctx,observers:hostObservers,onEvent}),
         pickProjectFolder,onExit:()=>ctx.shutdown(),canExit:()=>ctx.isIdle(),getPreferredModel:()=>modelPreference.resolve(ctx.modelRegistry.getAvailable()),onModelSelected:(model:any)=>modelPreference.save(model),
-        getHostStatuses,models:()=>ctx.modelRegistry.getAvailable(),hostSession:()=>ctx.sessionManager.getSessionFile(),voice,
+        getHostStatuses,models:async()=>{await catalogue.refresh(ctx);return ctx.modelRegistry.getAvailable();},hostSession:()=>ctx.sessionManager.getSessionFile(),voice,
         makeRpc:(options: any)=>createRpc({...options,cli:join(getPackageDir(),'dist','bundle','cli.js'),model:modelPreference.resolve(ctx.modelRegistry.getAvailable())||ctx.model})});
       try{web=await opening;}finally{opening=undefined;}
     }
@@ -57,7 +57,7 @@ export default function friendly(pi: ExtensionAPI) {
     ctx.ui.notify('Веб-интерфейс открыт в браузере. Оставьте pi запущенным.','info');
   };
   pi.on('session_shutdown',async()=>{await web?.close();web=undefined;unlockTerminal?.();unlockTerminal=undefined;});
-  installFriendly(pi, { billing,openExternal,linkAt:getOsc8LinkAtColumn,openWeb, isWebActive:()=>Boolean(web&&!web.closed), copyToClipboard, readClipboardText, sliceByColumn, matchesKey, truncate: truncateToWidth, measure: visibleWidth,
+  installFriendly(pi, { refreshModels:(ctx:any)=>catalogue.refresh(ctx), billing,openExternal,linkAt:getOsc8LinkAtColumn,openWeb, isWebActive:()=>Boolean(web&&!web.closed), copyToClipboard, readClipboardText, sliceByColumn, matchesKey, truncate: truncateToWidth, measure: visibleWidth,
     makeInput: () => new Input(),
     createVoice: callbacks => createVoiceService({root:join(getAgentDir(),'friendly-voice'),...callbacks}),
     makeEditor: (tui, theme, keys) => new CustomEditor(tui, theme, keys),

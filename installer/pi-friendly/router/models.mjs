@@ -140,10 +140,11 @@ export function installModelRefresh(pi, options = {}) {
       if (updated.length && options.saveConfigured) {
         try { await options.saveConfigured(updated, configured); } catch { cacheFailed = true; }
       }
+      if (updated.length) await ctx.modelRegistry.refresh?.({allowNetwork:false});
       const selected = ctx.model && ctx.modelRegistry.find(ctx.model.provider,ctx.model.id);
       const replacement = selected ?? updated.find(p=>p.provider===ctx.model?.provider)?.models[0];
       if (replacement && ctx.isIdle?.()) {
-        const resolved = ctx.modelRegistry.find(ctx.model.provider,replacement.id);
+        const resolved = ctx.modelRegistry.find(ctx.model?.provider ?? updated[0]?.provider,replacement.id);
         if (resolved) await pi.setModel(resolved);
       }
       return {providers:updated.length,models:updated.reduce((sum,r)=>sum+r.models.length,0),failed,cacheFailed};

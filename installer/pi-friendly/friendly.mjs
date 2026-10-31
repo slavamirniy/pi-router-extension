@@ -97,6 +97,7 @@ export function installFriendly(pi, rendering) {
   }
   async function selectModel(ctx) {
     if (!ctx.isIdle()) { ctx.ui.notify("Модель можно сменить после завершения ответа.", "info"); return; }
+    if(rendering.refreshModels) await withLoading("Обновляю модели…",()=>rendering.refreshModels(ctx));
     const models = ctx.modelRegistry.getAvailable();
     if (!models.length) { ctx.ui.notify("Нет доступных моделей. Добавьте подключение через /login.", "warning"); return; }
     const selected = await dialog(ctx, () => workspace?ctx.ui.custom((tui,_theme,_keys,done)=>{
