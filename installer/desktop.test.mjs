@@ -11,7 +11,9 @@ test('macOS app launcher survives spaces and apostrophes; reinstall preserves pr
     const home=path.join(root,"User's files");const icon=path.join(root,'icon.icns');await fs.writeFile(icon,'test-icon');
     const options={home,node:'/opt/private node/bin/node',pi:"/Users/Someone's npm/bin/pi",icon};
     const first=await createMacDesktop(options);
+    assert.equal(path.basename(first.app),'AI DIY.app');
     await fs.writeFile(path.join(first.project,'my-project.txt'),'keep');
+    await fs.rename(first.app,path.join(home,'Desktop','AI своими руками.app'));
     const second=await createMacDesktop(options);
     assert.equal(first.app,second.app);
     assert.equal(await fs.readFile(path.join(first.project,'my-project.txt'),'utf8'),'keep');
