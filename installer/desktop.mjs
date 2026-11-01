@@ -5,7 +5,15 @@ import {fileURLToPath} from 'node:url';
 const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 export async function createMacDesktop({home, node, pi, icon}) {
   const desktop = path.join(home, 'Desktop');
-  const app = path.join(desktop, 'AI своими руками.app');
+  const app = path.join(desktop, 'AI DIY.app');
+  const legacy = path.join(desktop, 'AI своими руками.app');
+  // Only migrate our launcher, never an unrelated application or project.
+  try {
+    const plist = await fs.readFile(path.join(legacy,'Contents','Info.plist'),'utf8');
+    if (plist.includes('<string>com.aidiy.launcher</string>')) {
+      try { await fs.access(app); } catch { await fs.rename(legacy,app); }
+    }
+  } catch {}
   const support = path.join(home, 'Library', 'Application Support', 'AI-DIY');
   const project = path.join(home, 'Documents', 'AI DIY Projects');
   for (const dir of [support,project,path.join(app,'Contents','MacOS'),path.join(app,'Contents','Resources')]) await fs.mkdir(dir,{recursive:true,mode:0o700});
@@ -18,8 +26,8 @@ export async function createMacDesktop({home, node, pi, icon}) {
   await fs.writeFile(path.join(app,'Contents','Info.plist'),`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>AI своими руками</string>
-<key>CFBundleDisplayName</key><string>AI своими руками</string>
+<key>CFBundleName</key><string>AI DIY</string>
+<key>CFBundleDisplayName</key><string>AI DIY</string>
 <key>CFBundleIdentifier</key><string>com.aidiy.launcher</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleExecutable</key><string>launch</string>
@@ -33,5 +41,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const [home,node,pi,icon]=process.argv.slice(2);
   if (![home,node,pi,icon].every(v=>v&&path.isAbsolute(v))) throw new Error('Absolute installer paths required');
   await createMacDesktop({home,node,pi,icon});
-  console.log('Desktop shortcut created: AI своими руками');
+  console.log('Desktop shortcut created: AI DIY');
 }

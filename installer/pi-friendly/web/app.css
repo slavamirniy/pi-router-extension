@@ -1,4 +1,4 @@
-/* ===== Просто pi — веб-версия ===== */
+/* ===== AI DIY — веб-версия ===== */
 *{box-sizing:border-box}
 :root{color-scheme:light;
  --bg:#fbfcfd;--side:#f0f3f5;--card:#f6f8fa;--hover:#e9eef2;--text:#1f2b34;--muted:#5f707c;--line:#dde4e9;
@@ -304,3 +304,5 @@ svg{stroke-width:1.65;vertical-align:middle}
 #messages::-webkit-scrollbar{display:none;width:0;height:0}
 
 .billing-email{display:block;margin:20px 0;font-size:14px;font-weight:600}.billing-email input[type="email"]{display:block;box-sizing:border-box;width:100%;min-width:0;min-height:48px;height:auto;padding:12px 14px;margin-top:8px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font:inherit;font-size:16px;color:var(--text);}.billing-email input::placeholder{color:var(--muted)}
+
+.brand-icon{width:32px;height:32px;border-radius:50%;object-fit:contain;flex:none}
