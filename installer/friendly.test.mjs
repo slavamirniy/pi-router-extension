@@ -12,6 +12,7 @@ async function directory(t) {
   t.after(() => fs.rm(dir, {recursive:true, force:true}));
   return dir;
 }
+const shippedVersion = JSON.parse(await fs.readFile(new URL('./pi-friendly/package.json', import.meta.url), 'utf8')).version;
 const fetch = async () => new Response(JSON.stringify({data:[{id:'kimi-k3'}]}));
 
 test('new and repeated installations load integrated UI/quota and preserve user projects/preferences', async t => {
@@ -19,9 +20,9 @@ test('new and repeated installations load integrated UI/quota and preserve user 
   const options = {configDir:dir, apiKey:'synthetic', baseURL:'https://example.test/v1'};
   const installed = await configure(options, {fetch});
   assert.equal(installed.uiInstalled, true);
-  assert.equal(installed.uiVersion, '0.12.4');
+  assert.equal(installed.uiVersion, shippedVersion);
   const ui = path.join(dir, 'extensions/pi-friendly');
-  for (const file of ['index.ts','friendly.mjs','surface.mjs','voice.mjs','voice-setup.mjs','voice-worker.py','voice_audio.py','web-server.mjs','web-rpc.mjs','web/index.html','web/app.js','web/app.css']) {
+  for (const file of ['index.ts','friendly.mjs','surface.mjs','voice.mjs','voice-setup.mjs','voice-worker.py','voice_audio.py','web-server.mjs','web-rpc.mjs','web/index.html','web/app.js','web/app.css','web/attachments.js','web/message-versions.js','web/fonts/geist-cyrillic.woff2','web/fonts/geist-mono-latin.woff2']) {
     assert.ok((await fs.stat(path.join(ui,file))).size);
   }
   await fs.writeFile(path.join(dir,'friendly-ui.json'), '{"theme":"dark"}');
@@ -49,7 +50,7 @@ test('upgrade from separate quota and old UI replaces runtime and backs up both 
   assert.deepEqual(await fs.readdir(path.join(dir,'extensions')),['pi-friendly']);
   const settings = JSON.parse(await fs.readFile(path.join(dir,'settings.json'),'utf8'));
   assert.deepEqual(settings.packages,[]); assert.deepEqual(settings.extensions,[]);
-  assert.equal(JSON.parse(await fs.readFile(path.join(oldUI,'package.json'),'utf8')).version,'0.12.4');
+  assert.equal(JSON.parse(await fs.readFile(path.join(oldUI,'package.json'),'utf8')).version,shippedVersion);
   assert.ok((await fs.readFile(path.join(oldUI,'bundled.ts'),'utf8')).includes("import routerProgress from './router/index.ts'"));
   assert.ok((await fs.stat(path.join(oldUI,'router/progress.mjs'))).size);
   const backups = await fs.readdir(path.join(dir,'backups'));
