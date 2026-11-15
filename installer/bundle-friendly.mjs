@@ -9,6 +9,7 @@ const git = (...args) => execFileSync('git', ['-C', repository, ...args], {maxBu
 const revision = git('rev-parse', process.argv[3] || 'HEAD').toString().trim();
 const files = git('ls-tree', '-r', '--name-only', revision).toString().trim().split('\n').filter(f =>
   f === 'LICENSE' || f === 'package.json' || f === 'router/LICENSE' ||
+  /^web\/fonts\/(?:[\w.-]+\.woff2|OFL-[\w.-]+\.txt)$/.test(f) ||
   /^(?:web|router)\/[\w.-]+\.(?:mjs|js|ts|css|html)$/.test(f) && !f.includes('.test.') ||
   /^[\w.-]+\.(?:mjs|ts|py)$/.test(f) && !/(?:\.test\.|^test_|smoke|preview)/.test(f));
 const target = new URL('./pi-friendly/', import.meta.url);

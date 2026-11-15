@@ -26,7 +26,11 @@ export function createWorkspace({ delegate, tui, theme, rendering, ctx, actions,
   const previousCursor=tui.getShowHardwareCursor?.();
   if(cleanView){tui.setShowHardwareCursor?.(true);tui.terminal.write('\x1b[5 q');}
 
-  const focused = () => !disposed && tui.getFocusedComponent() === proxy;
+  // Older PI TUI versions expose focus through the editor's Focusable contract.
+  // Missing focus information must never make clicks pass through modal windows.
+  const focused = () => !disposed && (typeof tui.getFocusedComponent === 'function'
+    ? tui.getFocusedComponent() === proxy
+    : delegate.focused === true);
   const size = () => `${tui.terminal.columns}:${tui.terminal.rows}`;
   const slash = () => /^\/[^\s]*$/.test(delegate.getText());
   const listCount = () => Math.max(0, Math.min(5, tui.terminal.rows - footerHeight() - 9, suggestions.length));

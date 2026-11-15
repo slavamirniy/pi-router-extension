@@ -1,15 +1,19 @@
 import {activityLabel} from './activity.mjs';
 import {clean} from './menu.mjs';
 const output=result=>(result?.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n').slice(-16000);
-export function toolView(c){return {id:c.id,name:c.name,label:activityLabel(c.name,c.arguments||{}),path:clean(c.arguments?.path||c.arguments?.file_path||''),command:clean(c.arguments?.command||''),status:'pending'};}
+export function toolView(c){return {id:c.id,name:c.name,label:activityLabel(c.name,c.arguments||{}),path:clean(c.arguments?.path||c.arguments?.file_path||''),command:clean(c.arguments?.command||''),status:'pending',images:[]};}
 export function publicMessage(message){
  const content=typeof message.content==='string'?[{type:'text',text:message.content}]:message.content||[];
  return {role:message.role,timestamp:message.timestamp,text:content.filter(c=>c.type==='text').map(c=>c.text).join('\n'),thinking:content.filter(c=>c.type==='thinking').map(c=>c.thinking||'').join('\n'),tools:content.filter(c=>c.type==='toolCall').map(toolView),error:message.errorMessage?clean(message.errorMessage):undefined,status:message.stopReason==='error'?'error':message.stopReason==='aborted'?'stopped':'done',usage:message.usage?{input:message.usage.input,output:message.usage.output}:undefined};
 }
-export function updateTool(tool,event){return {...tool,status:event.type==='tool_execution_end'?(event.isError?'error':'done'):'running',output:output(event.result||event.partialResult)||tool.output,started:tool.started||Date.now(),ended:event.type==='tool_execution_end'?Date.now():undefined};}
+export function updateTool(tool,event){
+ const details=event.result?.details||event.partialResult?.details;
+ const images=Array.isArray(details?.images)?details.images:details?.image?[details.image]:tool.images||[];
+ return {...tool,status:event.type==='tool_execution_end'?(event.isError?'error':'done'):'running',output:output(event.result||event.partialResult)||tool.output,images,started:tool.started||Date.now(),ended:event.type==='tool_execution_end'?Date.now():undefined};
+}
 export function publicMessages(messages){
  const results=new Map(messages.filter(m=>m.role==='toolResult').map(m=>[m.toolCallId,m]));
- return messages.filter(m=>['user','assistant'].includes(m.role)).map(m=>{const value=publicMessage(m);value.tools=value.tools.map(t=>{const result=results.get(t.id);return result?{...t,status:result.isError?'error':'done',output:output(result)}:t;});return value;});
+ return messages.filter(m=>['user','assistant'].includes(m.role)).map(m=>{const value=publicMessage(m);value.tools=value.tools.map(t=>{const result=results.get(t.id);if(!result)return t;const details=result.details;const images=Array.isArray(details?.images)?details.images:details?.image?[details.image]:t.images||[];return {...t,status:result.isError?'error':'done',output:output(result),images};});return value;});
 }
 // Provider snapshots can shrink or replace text after a retry. Keep the visible
 // draft as a labelled previous version, without sending it back to the model.
