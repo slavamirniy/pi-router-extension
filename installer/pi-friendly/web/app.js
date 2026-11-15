@@ -91,6 +91,8 @@ let pendingOpenId = null;
 let openPrevious = null;
 let queueCollapsed = false;
 let recentProjectOpenId = null;
+let recentSectionCollapsed = false;
+let recentSectionTouched = false;
 let renderedBranches = "";
 let projectPage = 1;
 let chatPage = 1;
@@ -556,6 +558,19 @@ function wireChrome() {
     else navigate("projects");
   };
   $("return-chat").onclick = () => returnToChat();
+  $("recent-section-toggle").onclick = (event) => {
+    event.stopPropagation();
+    recentSectionTouched = true;
+    recentSectionCollapsed = !recentSectionCollapsed;
+    if (recentSectionCollapsed) recentProjectOpenId = null;
+    renderBranches();
+  };
+  setTimeout(() => {
+    if (recentSectionTouched || recentSectionCollapsed || !state.active) return;
+    recentSectionCollapsed = true;
+    recentProjectOpenId = null;
+    renderBranches();
+  }, 4500);
   $("theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
   $("exit").onclick = () => {
     if (!$("exit").disabled) $("exit-dialog").showModal();
@@ -969,6 +984,8 @@ function navigate(target) {
 
 function openProject(project) {
   projectId = project.id;
+  recentSectionCollapsed = true;
+  recentProjectOpenId = null;
   chatPage = 1;
   page = "chats";
   searchValue = "";
@@ -982,6 +999,8 @@ function openBranch(chat) {
     showHint("Остановите ответ, чтобы переключить чат.", true);
     return;
   }
+  recentSectionCollapsed = true;
+  recentProjectOpenId = null;
   if (!pendingOpenId) openPrevious = { page, state };
   const previous = openPrevious;
   const token = ++openToken;
@@ -1059,6 +1078,8 @@ function newBranch() {
     return;
   }
   if (!canSwitch()) return;
+  recentSectionCollapsed = true;
+  recentProjectOpenId = null;
   run("Создаю чат…", async () => {
     const next = await api("new-chat", { project: target, fast: true }, 45000);
     applyState(next);
@@ -1127,6 +1148,12 @@ function renderRecentProjects() {
     projects = [...projects, openProjectEntry];
   }
   panel.hidden = false;
+  const toggle = $("recent-section-toggle");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", String(!recentSectionCollapsed));
+    toggle.classList.toggle("collapsed", recentSectionCollapsed);
+  }
+  list.hidden = recentSectionCollapsed;
   list.replaceChildren();
   const create = el("button", null, "recent-project recent-create");
   create.type = "button";
@@ -1161,6 +1188,7 @@ function renderRecentProjects() {
     row.lastChild.classList.add("recent-chevron");
     row.onclick = (event) => {
       event.stopPropagation();
+      recentSectionTouched = true;
       recentProjectOpenId = recentProjectOpenId === project.id ? null : project.id;
       renderBranches();
     };
@@ -1214,6 +1242,7 @@ function renderBranches() {
     state.active?.name || null,
     Boolean(state.busy),
     recentProjectOpenId,
+    recentSectionCollapsed,
   ]);
   if (signature === renderedBranches) return;
   renderedBranches = signature;

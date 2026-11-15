@@ -31,7 +31,10 @@
         </button>
 
         <section class="recent-projects" id="recent-projects" hidden aria-label="Последние проекты">
-          <div class="section-title"><span>Последние</span></div>
+          <button type="button" id="recent-section-toggle" class="section-title recent-section-toggle" aria-expanded="true" aria-controls="recent-project-list">
+            <span>Последние</span>
+            <span class="recent-section-chevron" data-icon="chevron-down" aria-hidden="true"></span>
+          </button>
           <div class="recent-project-list" id="recent-project-list"></div>
         </section>
 
