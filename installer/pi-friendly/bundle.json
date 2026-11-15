@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
   "revision": "03dd18946c74052abd99c1314fdb794a5a0bdefe",
-  "version": "0.12.9",
+  "version": "0.12.10",
   "embeddedRouter": true,
   "files": {
     "LICENSE": "7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd",
@@ -15,13 +15,13 @@
     "folder-picker.mjs": "0e1bbc47354a8c28e4f1bb08dab97bad39a3518f5b2e2c84dcd0ac2e3d6f5f4e",
     "friendly.mjs": "2131b2c6705490f5a70d7816f47717eba9fd0d16d3d1ccd74268d50ab770d8b9",
     "hover.mjs": "1e7a997b044de13322ef46b2332ed010c1e630ad161ef7bc3cd94b2bc5dcad48",
-    "index.ts": "d4a291c9fee1b08ffc2b02a351fae95a893719b3d0e64732095ec72185ed12bf",
+    "index.ts": "8773a8f77f68adb1d32570af68f214341646e54cc3c5a616420ec99a0599a801",
     "legal.mjs": "4863b553ef2e4ac9717093be4a42411522d15520a7d9e2d54a8ae66afe1dc938",
     "menu.mjs": "9ca8cadc393640c5b8982db2348ed6afa188875d02b8e8fb9a5e1c5deb766c19",
     "model-picker.mjs": "b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689",
     "model-preference.mjs": "11f3313f11cff5ebe8fe981855219de1c833100d3106c765308beec3d173f798",
     "mouse.mjs": "4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0",
-    "package.json": "494e8c4ff4dd230000841bca12174a9f6a7942432b45a509881a4372c4d93f29",
+    "package.json": "3f75c7956ca89abacd7f8d406290d1c338e7ab810f8c7e935a54a1e69a84c3e3",
     "project-form.mjs": "01392d32b7a83f61afdf7ee0c44d001b6ff92692adb60cb3a42be6ffe5c9c138",
     "projects.mjs": "a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03",
     "router/LICENSE": "7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710",
@@ -46,7 +46,8 @@
     "web/index.html": "41ff6e742cbb9e2c0b94e2494ffb7bf8833baa49a49fdd68f2704b186c0e1399",
     "workspace.mjs": "25c252e02be2a8a7037d36854d6d3adcf0a833de637304e33ac9ee924a0d9329",
     "web/links.mjs": "cc2ce771894e8323c67128037d1cdadaeb22327a86754bcbe992fc85685590e8",
-    "web/brand.jpg": "c9d1c1b7859d2b263595f996d7cb9c9bd433caaf406ce05aa82521083a7a6823"
+    "web/brand.jpg": "c9d1c1b7859d2b263595f996d7cb9c9bd433caaf406ce05aa82521083a7a6823",
+    "image-tool.mjs": "6119b5bd08ee2916c203ea3dd9e9c78ec5673e301b5e00b0ebb3bcd2dd3a7e3a"
   },
   "patch": "ai-diy-brand-20261101"
 }

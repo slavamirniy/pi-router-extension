@@ -1,3 +1,5 @@
+import { Type } from '@earendil-works/pi-ai';
+import { runImageTool } from './image-tool.mjs';
 import {safeLink,safeTerminalLinks} from './web/links.mjs';
 import routerProgress from './router/index.ts';
 import {createBilling} from './billing.mjs';
@@ -18,10 +20,21 @@ import { join } from "node:path";
 import { installFriendly } from "./friendly.mjs";
 export default function friendly(pi: ExtensionAPI) {
   let billingContext:any;
-  const billing=createBilling({receiptFile:join(getAgentDir(),'purchase-consents.jsonl'),getConnection:async()=>{
+  const getConnection=async()=>{
     const m=billingContext?.modelRegistry.getAvailable().find((m:any)=>m.provider==='router');
     if(!m)throw Error('Роутер не подключён.');const auth=await billingContext.modelRegistry.getApiKeyAndHeaders(m);if(!auth?.ok)throw Error('Доступ к роутеру не настроен.');const bearer=Object.entries(auth.headers||{}).find(([k])=>k.toLowerCase()==='authorization')?.[1];return {baseURL:auth.baseUrl||m.baseUrl,apiKey:typeof bearer==='string'&&/^Bearer /i.test(bearer)?bearer.slice(7):auth.apiKey};
-  }});
+  };
+  const billing=createBilling({receiptFile:join(getAgentDir(),'purchase-consents.jsonl'),getConnection});
+  pi.registerTool({
+    name:'generate_image',label:'Создать изображение',
+    description:'Generate an image from a description, or edit a project image using its relative path. Uses a paid image credit operation. Use only when the user asks to generate or edit an image.',
+    parameters:Type.Object({prompt:Type.String(),source:Type.Optional(Type.String({description:'Relative path to a source PNG or JPEG in this project'}))}),
+    async execute(_id,params,signal,_update,ctx){
+      const result=await runImageTool(params,ctx.cwd,await getConnection(),signal);
+      void billing.refresh();
+      return result;
+    }
+  });
   let billingTimer:any;
   pi.on('session_start',async(_event,ctx)=>{billingContext=ctx;if(ctx.mode!=='tui')return;void billing.refresh();clearInterval(billingTimer);billingTimer=setInterval(()=>void billing.refresh(),30000);billingTimer.unref?.();});
   pi.on('agent_end',()=>{void billing.refresh();});
