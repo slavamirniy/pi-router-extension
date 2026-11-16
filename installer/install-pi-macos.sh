@@ -10,7 +10,7 @@ cleanup_mac() { [[ "${TASK_MAC_TMP##*/}" == ai-diy-install.* ]] && rm -rf -- "$T
 trap cleanup_mac EXIT
 TASK_ASSETS='https://raw.githubusercontent.com/slavamirniy/pi-router-extension/852c8a43e50d5f2b4fa076362e6cdb1d080423d2'
 curl --retry 2 --retry-all-errors --retry-delay 1 --connect-timeout 10 --max-time 90 -fsSL --proto '=https' --tlsv1.2 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/v1.0.16/installer/install-pi-linux.sh' -o "$TASK_MAC_TMP/common.sh"
-TASK_COMMON_HASH='52c0b953d89605bf320f4d64ccb2aca10cb81bcf511aeafd9577ae5cf69fe0cd'
+TASK_COMMON_HASH='400bf5865d9190e442c0d68511b9f02d4d382fb3eb9b4e2e5932b06672ccf3a4'
 [[ "$(shasum -a 256 "$TASK_MAC_TMP/common.sh" | cut -d ' ' -f 1)" == "$TASK_COMMON_HASH" ]] || { echo 'Installer integrity check failed.' >&2; exit 1; }
 bash "$TASK_MAC_TMP/common.sh"
 unset PI_API_KEY PI_BASE_URL PI_DEFAULT_MODEL

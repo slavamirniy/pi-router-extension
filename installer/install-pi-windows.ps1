@@ -18,7 +18,7 @@ $TaskProvider = if ($env:PI_PROVIDER_NAME) { $env:PI_PROVIDER_NAME } else { 'rou
 $TaskDefault = $env:PI_DEFAULT_MODEL
 $TaskConfigDir = $env:PI_CODING_AGENT_DIR
 Remove-Item Env:PI_API_KEY,Env:PI_BASE_URL,Env:PI_PROVIDER_NAME,Env:PI_DEFAULT_MODEL -ErrorAction SilentlyContinue
-$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/882a62904a8533dfcc06df942f91e9481e8b6400'
+$TaskSource = 'https://raw.githubusercontent.com/slavamirniy/pi-router-extension/6e882b9a44b197aba11e9a15ab0c5dc34ad1d6e4'
 if ([string]::IsNullOrWhiteSpace($TaskBase)) { throw 'Set PI_BASE_URL to your API address, including /v1.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 function Write-Ok([string]$Message) {
@@ -228,7 +228,7 @@ $TaskManifest = @{
     'installer/autoupdate/update.mjs' = '7dc23c9ade8a379debe873aa230ae6890253ab90a29983f1f3640e73d17843ab'
     'installer/autoupdate/worker.mjs' = '069e1ca196a040236a6f77446058c0ceb0581d1677c546e179432c87ecc5bb44'
     'installer/autoupdate/trust.mjs' = 'af4d57b531555bd7102f1bf48dbbded9ad801a85cc9cb319d5e0c6b35859e07f'
-    'installer/pi-friendly/bundle.json' = '19f08e6f5c536ad6145e248ba5a616fccb6f436f4cf1c4e59d6306808691182b'
+    'installer/pi-friendly/bundle.json' = 'b8aee653d42a73973055202431d8a3717eda0b2a6322d1beea8b5afdd7258aa1'
     'installer/pi-friendly/browser-start.mjs' = '0d524fae8ca04affc5cf396d7903605397b4ebd46b388f397a6742baa7567133'
     'installer/pi-friendly/LICENSE' = '7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd'
     'installer/pi-friendly/activity.mjs' = 'a24f1ffbf7e53c3167a7fcbd0b93655ee63c46a3d506f41a8ed2fe4bdc93e3e3'
@@ -242,7 +242,7 @@ $TaskManifest = @{
     'installer/pi-friendly/friendly.mjs' = '67b30dff0d4f9985ee13bb202a53facbd5dc3e75fcb384e4228fa689f453f32b'
     'installer/pi-friendly/hover.mjs' = '1e7a997b044de13322ef46b2332ed010c1e630ad161ef7bc3cd94b2bc5dcad48'
     'installer/pi-friendly/image-tool.mjs' = '958bff597bb371eed6815a07dadcecf2b412714a72b213ea6a28b454a184f2ff'
-    'installer/pi-friendly/index.ts' = '28f33f282569fa39e761c42a9248afe855959553188b3299748ea06142393ea6'
+    'installer/pi-friendly/index.ts' = 'ab72df94f74916d932f1592efb6f6f7bd074679c3a06fc64db8ee061b4f0ac91'
     'installer/pi-friendly/legal.mjs' = '4863b553ef2e4ac9717093be4a42411522d15520a7d9e2d54a8ae66afe1dc938'
     'installer/pi-friendly/menu.mjs' = '9ca8cadc393640c5b8982db2348ed6afa188875d02b8e8fb9a5e1c5deb766c19'
     'installer/pi-friendly/model-picker.mjs' = 'b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689'
@@ -269,7 +269,7 @@ $TaskManifest = @{
     'installer/pi-friendly/web-rpc.mjs' = '495309052bfc3016a397cb32da788968fc428bc6d9cad3e9bf9b1618458b857f'
     'installer/pi-friendly/web-server.mjs' = '4718a320787f48c3308689185c535be84fe9056e90a8e032200c9ef25a15eaa8'
     'installer/pi-friendly/web/app.css' = '1353715cd49283b29fd97b59f660c8ba23e043471967824a9b83a0e9b620548d'
-    'installer/pi-friendly/web/app.js' = 'c0cf27fee7760b289348853248dcc80922137e729deec71526bd77ae5b9810ab'
+    'installer/pi-friendly/web/app.js' = '968c471b8fb278df6d81bc7be92bb909e2ae0077bf2c37dbcd47587763adcc67'
     'installer/pi-friendly/web/attachments.js' = '49366bf020821f68ff0f96395d1f8c9e12d8d4b0a8075ecdf65561a095ec8d5e'
     'installer/pi-friendly/web/billing-ui.js' = '908cdbe3cbb94fa2eb6e3ab8c1c5d22c92d176644ebc45f6e7743639fca2cf17'
     'installer/pi-friendly/web/fonts/OFL-Geist-Mono.txt' = 'cc815ed4fc045f0e991abb10395b7932bd028c6a067deb13316d6002105074e6'
