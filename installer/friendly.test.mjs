@@ -22,7 +22,7 @@ test('new and repeated installations load integrated UI/quota and preserve user 
   assert.equal(installed.uiInstalled, true);
   assert.equal(installed.uiVersion, shippedVersion);
   const ui = path.join(dir, 'extensions/pi-friendly');
-  for (const file of ['index.ts','friendly.mjs','surface.mjs','voice.mjs','voice-setup.mjs','voice-worker.py','voice_audio.py','web-server.mjs','web-rpc.mjs','web/index.html','web/app.js','web/app.css','web/attachments.js','web/message-versions.js','web/fonts/geist-cyrillic.woff2','web/fonts/geist-mono-latin.woff2']) {
+  for (const file of ['index.ts','friendly.mjs','surface.mjs','voice.mjs','voice-setup.mjs','voice-worker.py','voice_audio.py','browser-start.mjs','web-server.mjs','web-rpc.mjs','web/index.html','web/app.js','web/app.css','web/attachments.js','web/message-versions.js','web/fonts/geist-cyrillic.woff2','web/fonts/geist-mono-latin.woff2']) {
     assert.ok((await fs.stat(path.join(ui,file))).size);
   }
   await fs.writeFile(path.join(dir,'friendly-ui.json'), '{"theme":"dark"}');
