@@ -16,8 +16,38 @@ import {publicMessage,publicMessages,mergeMessage,reconcileMessages,toolView,upd
 import {finalChatTitle,fallbackChatTitle,isValidChatTitle} from './title.mjs';
 import {stripAttachments} from './web/attachments.js';
 export {publicMessage,publicMessages} from './web-messages.mjs';
-export async function startWebServer({billing,projects,listSessions,readSession,makeRpc,makeHostRpc,getHostStatuses=()=>[],models=()=>[],hostSession=()=>undefined,voice,port=0,onExit=()=>{},canExit=()=>true,getPreferredModel=()=>undefined,onModelSelected=()=>{},pickProjectFolder,generateTitle,pickChatFiles,sessionDirFor,dropDir,generateImage}){
+export async function startWebServer({billing,projects,listSessions,readSession,makeRpc,makeHostRpc,getHostStatuses=()=>[],models=()=>[],hostSession=()=>undefined,voice,port=0,tabCloseGraceMs=8000,disconnectGraceMs=90000,onExit=()=>{},canExit=()=>true,getPreferredModel=()=>undefined,onModelSelected=()=>{},pickProjectFolder,generateTitle,pickChatFiles,sessionDirFor,dropDir,generateImage}){
  const token=randomBytes(32).toString('hex'),cookie='pf_'+randomBytes(6).toString('hex'),clients=new Set();
+ // A document has its own ID, including duplicated tabs and pages opened by reload.
+ const tabs = new Map();
+ let navigationDeadline = 0;
+ const validTab = id => typeof id === 'string' && /^[a-f0-9-]{36}$/.test(id);
+ function expireTab(id, tab, delay) {
+  clearTimeout(tab.timer);
+  tab.timer = setTimeout(() => {
+   if (tabs.get(id) !== tab || disposed) return;
+   tabs.delete(id);
+   if (!tabs.size) void exitApplication().catch(error => console.error('Pi shutdown:', error.message));
+  }, Math.max(delay, navigationDeadline - Date.now()));
+  tab.timer.unref();
+ }
+ function attachTab(id, stream) {
+  const tab = tabs.get(id) || {};
+  clearTimeout(tab.timer);
+  tab.stream = stream;
+  tabs.set(id, tab);
+  if (stream) navigationDeadline = 0;
+  if (!stream) expireTab(id, tab, disconnectGraceMs);
+  else stream.once('close', () => {
+   if (disposed || tabs.get(id) !== tab || tab.stream !== stream) return;
+   tab.stream = null;
+   expireTab(id, tab, disconnectGraceMs);
+  });
+ }
+ async function exitApplication() {
+  if (disposed) return;
+  try { await close(); } finally { await onExit(); }
+ }
  let confirmBrowser;
  const browserReady=new Promise(resolve=>{confirmBrowser=resolve;});
  let rpc,active,loading=false,navigating=false,disposed=false,allProjects=[],allSessions=[],generation=0,publishTimer,voiceOwned=false,dropRoot;
@@ -304,11 +334,21 @@ export async function startWebServer({billing,projects,listSessions,readSession,
    if(req.method==='POST'&&url.pathname==='/api/auth'){
     const data=await body(req),supplied=Buffer.from(String(data.token||'')),expected=Buffer.from(token);
     if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected)){reply(403,{error:'Откройте веб-интерфейс кнопкой в pi.'});return;}
+    if(validTab(data.tab) && !tabs.has(data.tab)) attachTab(data.tab, null);
     res.setHeader('Set-Cookie',`${cookie}=${token}; HttpOnly; SameSite=Strict; Path=/`);reply(200,{ok:true});confirmBrowser(true);return;
    }
    if(url.pathname.startsWith('/api/')){
     if(!(req.headers.cookie||'').split(';').some(v=>v.trim()===`${cookie}=${token}`)){reply(401,{error:'Откройте веб-интерфейс кнопкой в pi.'});return;}
-    if(req.method==='GET'&&url.pathname==='/api/events'){res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write('data: '+JSON.stringify(snapshot())+'\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
+    if(req.method==='POST' && url.pathname==='/api/tab-left'){
+     const {tab:id}=await body(req,1024);
+     const tab=tabs.get(id);
+     if(tab){
+      tab.stream=null;
+      expireTab(id,tab,tabCloseGraceMs);
+     }
+     reply(200,{ok:true});return;
+    }
+    if(req.method==='GET'&&url.pathname==='/api/events'){const id=url.searchParams.get('tab');if(validTab(id))attachTab(id,res);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write('data: '+JSON.stringify(snapshot())+'\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;}
     if(req.method==='GET'&&url.pathname==='/api/billing'){reply(200,billing?.snapshot()||{});return;}
     if(req.method==='GET'&&url.pathname==='/api/offers'){if(!billing)throw Error('Пополнение не подключено.');reply(200,await billing.offers());return;}
     if(req.method==='GET'&&url.pathname==='/api/catalog'){reply(200,{projects:await catalog()});return;}
@@ -429,7 +469,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
      else if(voice.state.phase==='error'){await voice.start();}else throw new Error('Для голосового ввода дождитесь загрузки модели или завершения записи.');
      reply(200,{ok:true});return;
     }
-    if(action==='close'){ensureIdle();if(!canExit())throw new Error('Сначала остановите текущую работу.');navigating=true;reply(200,{ok:true});setTimeout(async()=>{await close();await onExit();},50);return;}
+    if(action==='close'){ensureIdle();if(!canExit())throw new Error('Сначала остановите текущую работу.');navigating=true;reply(200,{ok:true});setTimeout(()=>void exitApplication().catch(error=>console.error('Pi shutdown:',error.message)),50);return;}
     if(action==='pick-attach'){
      if(!pickChatFiles)throw new Error('Выбор файлов доступен только в локальном интерфейсе.');
      const files=await pickChatFiles();
@@ -634,13 +674,20 @@ export async function startWebServer({billing,projects,listSessions,readSession,
     }
     reply(404,{error:'Неизвестное действие.'});return;
    }
-   const assets={'/':['web/index.html','text/html'],'/app.js':['web/app.js','text/javascript'],'/app.css':['web/app.css','text/css'],'/billing-ui.js':['web/billing-ui.js','text/javascript'],'/message-versions.js':['web/message-versions.js','text/javascript'],'/attachments.js':['web/attachments.js','text/javascript'],'/fonts/geist-cyrillic.woff2':['web/fonts/geist-cyrillic.woff2','font/woff2'],'/fonts/geist-latin.woff2':['web/fonts/geist-latin.woff2','font/woff2'],'/fonts/geist-mono-cyrillic.woff2':['web/fonts/geist-mono-cyrillic.woff2','font/woff2'],'/fonts/geist-mono-latin.woff2':['web/fonts/geist-mono-latin.woff2','font/woff2'],'/fonts/OFL-Geist.txt':['web/fonts/OFL-Geist.txt','text/plain'],'/fonts/OFL-Geist-Mono.txt':['web/fonts/OFL-Geist-Mono.txt','text/plain']},asset=assets[url.pathname];
+   const assets={'/':['web/index.html','text/html'],'/app.js':['web/app.js','text/javascript'],'/onboarding.js':['web/onboarding.js','text/javascript'],'/app.css':['web/app.css','text/css'],'/billing-ui.js':['web/billing-ui.js','text/javascript'],'/message-versions.js':['web/message-versions.js','text/javascript'],'/attachments.js':['web/attachments.js','text/javascript'],'/fonts/geist-cyrillic.woff2':['web/fonts/geist-cyrillic.woff2','font/woff2'],'/fonts/geist-latin.woff2':['web/fonts/geist-latin.woff2','font/woff2'],'/fonts/geist-mono-cyrillic.woff2':['web/fonts/geist-mono-cyrillic.woff2','font/woff2'],'/fonts/geist-mono-latin.woff2':['web/fonts/geist-mono-latin.woff2','font/woff2'],'/fonts/OFL-Geist.txt':['web/fonts/OFL-Geist.txt','text/plain'],'/fonts/OFL-Geist-Mono.txt':['web/fonts/OFL-Geist-Mono.txt','text/plain']},asset=assets[url.pathname];
    if(req.method!=='GET'||!asset){reply(404,{error:'Страница не найдена.'});return;}
+   // A native reload reaches the local HTML endpoint before scripts and styles finish loading.
+   if(url.pathname==='/' && req.headers['sec-fetch-dest']==='document' &&
+      (req.headers.cookie||'').split(';').some(v=>v.trim()===`${cookie}=${token}`)){
+    navigationDeadline=Date.now()+disconnectGraceMs;
+    for(const [id,tab] of tabs)if(!tab.stream)expireTab(id,tab,disconnectGraceMs);
+   }
    res.writeHead(200,{'Content-Type':asset[1]+'; charset=utf-8','Cache-Control':asset[1]==='font/woff2'?'public, max-age=86400':'no-store'});res.end(await readFile(fileURLToPath(new URL(asset[0],import.meta.url))));
   }catch(error){if(!res.headersSent)reply(400,{error:error.message});else res.end();}
  });
  const heartbeat=setInterval(()=>{for(const res of clients)res.write(': heartbeat\n\n');state.questions=state.questions.filter(q=>!q.expires||q.expires>Date.now());},15000);heartbeat.unref();
- async function close(){if(disposed)return;disposed=true;generation++;unsub?.();unsubBilling?.();if(voiceOwned)voice?.cancel();clearInterval(heartbeat);clearTimeout(publishTimer);for(const client of clients)client.end();clients.clear();server.close();server.closeIdleConnections?.();await rpc?.dispose();}
+ async function close(){if(disposed)return;disposed=true;for(const tab of tabs.values())clearTimeout(tab.timer);tabs.clear();generation++;unsub?.();unsubBilling?.();if(voiceOwned)voice?.cancel();clearInterval(heartbeat);clearTimeout(publishTimer);for(const client of clients)client.end();clients.clear();server.close();server.closeIdleConnections?.();await rpc?.dispose();}
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});origin=`http://127.0.0.1:${server.address().port}`;
  return {url:origin+'/#'+token,origin,browserReady,async close(){confirmBrowser(false);await close();},get closed(){return disposed;}};
 }
+

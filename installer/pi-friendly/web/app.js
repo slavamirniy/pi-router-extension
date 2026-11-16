@@ -1,6 +1,7 @@
 import { createBillingUI } from "./billing-ui.js";
 import { createVersionManager } from "./message-versions.js";
 import { splitAttachments, buildOutgoingText } from "./attachments.js";
+import { createOnboarding, voiceIsAvailable } from "./onboarding.js";
 
 const billingUI = createBillingUI();
 const versionManager = createVersionManager();
@@ -72,16 +73,21 @@ function el(tag, text, cls) {
 
 /* ============================== state ============================== */
 
+const onboarding = createOnboarding({ document, window, icon });
+
 let page = "projects";
 let projectId = null;
 let catalog = [];
 let catalogLoading = true;
 let catalogError = "";
 let state = {};
+let tabId = crypto.randomUUID();
+let allowUnload = false;
 let source;
 let connected = false;
 let booting = true;
 let pending = 0;
+let projectCreationInFlight = false;
 let operationLabel = "";
 let uploading = false;
 let editingIndex = null;
@@ -123,6 +129,10 @@ let draggingImageCard = null;
 let imageJobs = [];
 let imageProgressTimer = null;
 let voiceTarget = "chat";
+let onboardingModel = null;
+let onboardingBusy = false;
+let onboardingToken = null;
+let onboardingProject = null;
 let imageRefreshPending = false;
 let imageRefreshQueued = false;
 try {
@@ -449,6 +459,335 @@ function markdown(parent, text) {
   if (code) parent.append(code);
 }
 
+/* ============================== onboarding ============================== */
+
+function onboardingNode() {
+  return $("onboarding");
+}
+
+function onboardingVisible() {
+  const node = onboardingNode();
+  return Boolean(node && !node.hidden && !node.classList.contains("closing"));
+}
+
+function showOnboardingStep(step) {
+  for (const name of ["start", "name", "prompt"]) {
+    const node = $("onboarding-" + name);
+    if (node) node.hidden = name !== step;
+  }
+  if (step === "name") {
+    updateOnboarding();
+    onboarding.bindProject($("onboarding-name-input"), $("onboarding-create"));
+    setTimeout(() => $("onboarding-name-input").focus(), 0);
+  } else if (step === "prompt") {
+    setTimeout(() => $("onboarding-prompt-input").focus(), 0);
+  }
+  updateOnboarding();
+}
+
+function showOnboardingName(first = false) {
+  $("onboarding-name-title").textContent = first
+    ? "Давайте создадим ваш первый проект"
+    : "Как назовем ваш проект?";
+  $("onboarding-name-subtitle").textContent = first
+    ? "Введите название — сразу перейдём к первому запросу."
+    : "Название можно будет изменить позже.";
+  $("onboarding-name-back").hidden = first;
+  $("onboarding-name-input").value = "";
+  $("onboarding-name-error").textContent = "";
+  showOnboardingStep("name");
+}
+
+function openOnboardingProject(project) {
+  const chat = [...(project.chats || [])].sort((a, b) => Number(b.modified || 0) - Number(a.modified || 0))[0];
+  hideOnboarding();
+  if (chat) {
+    projectId = project.id;
+    openBranch(chat);
+  } else {
+    openProject(project);
+  }
+}
+
+function renderOnboardingRecent() {
+  const box = $("onboarding-recent");
+  const list = $("onboarding-recent-list");
+  if (!box || !list) return;
+  const projects = catalog.slice(0, 4);
+  box.hidden = !projects.length;
+  list.replaceChildren();
+  for (const project of projects) {
+    const chat = [...(project.chats || [])].sort((a, b) => Number(b.modified || 0) - Number(a.modified || 0))[0];
+    const row = el("button", null, "onboarding-recent-row");
+    row.type = "button";
+    row.title = chat ? `${project.name} · ${chat.name || "Чат"}` : project.name;
+    row.append(icon("folder"));
+    const copy = el("span", null, "onboarding-recent-copy");
+    copy.append(el("strong", project.name));
+    row.append(copy);
+    row.onclick = () => openOnboardingProject(project);
+    list.append(row);
+  }
+}
+
+function refreshOnboardingChoices() {
+  const loading = $("onboarding-loading");
+  const choices = document.querySelector(".onboarding-choices");
+  if (loading) loading.hidden = true;
+  if (!onboardingVisible()) return;
+  if ($("onboarding-start").hidden) return;
+  if (catalog.length) {
+    $("onboarding-projects").hidden = false;
+    choices.hidden = false;
+    choices.classList.add("single");
+    $("onboarding-new-project").hidden = false;
+    $("onboarding-new-project").disabled = false;
+    $("onboarding-new-project").classList.remove("primary");
+    renderOnboardingRecent();
+  } else {
+    $("onboarding-projects").hidden = true;
+    choices.hidden = true;
+    $("onboarding-recent").hidden = true;
+    $("onboarding-new-project").disabled = false;
+    showOnboardingName(true);
+  }
+}
+
+function showOnboarding() {
+  onboardingModel = null;
+  onboardingBusy = false;
+  onboardingToken = null;
+  onboardingProject = null;
+  voiceTarget = "chat";
+  $("onboarding-name-input").value = "";
+  $("onboarding-name-error").textContent = "";
+  $("onboarding-name-title").textContent = "Как назовем ваш проект?";
+  $("onboarding-name-subtitle").textContent = "Название можно будет изменить позже.";
+  $("onboarding-name-back").hidden = false;
+  $("onboarding-prompt-input").value = "";
+  $("onboarding-prompt-error").textContent = "";
+  const loading = $("onboarding-loading");
+  if (loading) loading.hidden = false;
+  const choices = document.querySelector(".onboarding-choices");
+  if (choices) choices.hidden = true;
+  $("onboarding-projects").hidden = true;
+  $("onboarding-recent").hidden = true;
+  $("onboarding-new-project").disabled = true;
+  $("onboarding-new-project").classList.remove("primary");
+  $("onboarding-model").replaceChildren(el("span", "Модель"), icon("chevron-down"));
+  $("onboarding-model").disabled = true;
+  $("onboarding-mic").disabled = true;
+  onboardingNode().hidden = false;
+  onboardingNode().classList.remove("closing");
+  showOnboardingStep("start");
+  renderOnboardingModel();
+}
+
+function hideOnboarding() {
+  const node = onboardingNode();
+  if (!node || node.hidden) return;
+  if (voiceTarget === "onboarding") voiceTarget = "chat";
+  history.replaceState({ ...history.state, workspaceOpen: true }, "");
+  node.classList.add("closing");
+  updateOnboarding();
+  setTimeout(() => {
+    node.hidden = true;
+    node.classList.remove("closing");
+  }, 190);
+}
+
+async function loadOnboardingModels() {
+  const button = $("onboarding-model");
+  if (!button || modelsLoading) return;
+  if (!modelsLoaded) await loadModels();
+  const models = modelList;
+  if (!models.length) return;
+  document.querySelectorAll(".onboarding-model-menu").forEach((node) => node.remove());
+  const menu = el("div", null, "onboarding-model-menu");
+  const rect = button.getBoundingClientRect();
+  for (const model of models) {
+    const option = el("button", null, "onboarding-model-option");
+    option.type = "button";
+    option.append(el("span", model.name || model.id), el("small", model.provider || ""));
+    option.onclick = () => {
+      onboardingModel = model;
+      button.textContent = model.name || model.id;
+      menu.remove();
+    };
+    menu.append(option);
+  }
+  document.body.append(menu);
+  menu.style.left = Math.min(rect.left, innerWidth - 268) + "px";
+  menu.style.top = rect.bottom + 8 + "px";
+  const close = (event) => {
+    if (menu.contains(event.target)) return;
+    menu.remove();
+    document.removeEventListener("click", close, true);
+  };
+  setTimeout(() => document.addEventListener("click", close, true), 0);
+}
+
+async function onboardingEnterProject(projectName, prompt) {
+  if (onboardingBusy) return;
+  const name = String(projectName || "").trim();
+  if (!name) {
+    $("onboarding-name-error").textContent = "Введите название проекта.";
+    $("onboarding-name-input").focus();
+    return;
+  }
+  onboardingBusy = true;
+  $("onboarding-create").disabled = true;
+  $("onboarding-name-back").disabled = true;
+  $("onboarding-create").textContent = "Создаю";
+  const spinner = el("span", null, "project-create-spinner");
+  spinner.setAttribute("aria-hidden", "true");
+  $("onboarding-create").replaceChildren(spinner, el("span", "Создать проект"));
+  onboarding.projectLoading(true);
+  projectCreationInFlight = true;
+  let creationTimer;
+  const minimumLoading = new Promise(resolve => { creationTimer = setTimeout(resolve, 5000); });
+  $("onboarding-create").classList.add("is-loading");
+  $("onboarding-create").setAttribute("aria-busy", "true");
+  $("onboarding-name-error").textContent = "";
+  try {
+    const [reply] = await Promise.all([api("create-project", { name }, 60000), minimumLoading]);
+    projectCreationInFlight = false;
+    const created = state.active?.id && state.active.id === reply.active?.id ? state : reply;
+    applyState(created);
+    projectId = created.active?.projectId || null;
+    page = "chat";
+    renderRoute();
+    await loadCatalog().catch(() => {});
+    onboardingProject = created.active?.projectId || null;
+    if (prompt && String(prompt).trim()) {
+      await sendOnboardingPrompt(prompt);
+    } else {
+      showOnboardingStep("prompt");
+      renderOnboardingModel();
+      loadModels();
+    }
+  } catch (error) {
+    $("onboarding-name-error").textContent = error.message || "Не удалось создать проект.";
+  } finally {
+    clearTimeout(creationTimer);
+    projectCreationInFlight = false;
+    onboarding.projectLoading(false);
+    onboardingBusy = false;
+    $("onboarding-create").disabled = false;
+    $("onboarding-name-back").disabled = false;
+    $("onboarding-create").textContent = "Создать проект";
+    $("onboarding-create").classList.remove("is-loading");
+    $("onboarding-create").removeAttribute("aria-busy");
+  }
+}
+
+async function sendOnboardingPrompt(text) {
+  const value = String(text || "").trim();
+  const error = $("onboarding-prompt-error");
+  if (!value) {
+    error.textContent = "Опишите задачу или наговорите голосом.";
+    $("onboarding-prompt-input").focus();
+    return;
+  }
+  if (!state.active) {
+    error.textContent = "Чат ещё открывается. Подождите секунду.";
+    return;
+  }
+  if (onboardingModel && onboardingModel.id) {
+    const current = state.active.model;
+    if (!current || current.id !== onboardingModel.id || current.provider !== onboardingModel.provider) {
+      try {
+        await api("model", { chat: state.active.id, id: onboardingModel.id, provider: onboardingModel.provider }, 30000);
+        state.active = { ...state.active, model: onboardingModel };
+      } catch (failure) {
+        $("onboarding-prompt-error").textContent = failure.message || "Не удалось выбрать модель.";
+        return;
+      }
+    }
+  }
+  error.textContent = "";
+  onboardingBusy = true;
+  $("onboarding-send").disabled = true;
+  $("onboarding-prompt-input").value = "";
+  hideOnboarding();
+  sendMessage(value);
+  onboardingBusy = false;
+  $("onboarding-send").disabled = false;
+}
+
+function renderOnboardingModel() {
+  const button = $("onboarding-model");
+  if (!button) return;
+  const model = state.active?.model;
+  button.replaceChildren(el("span", model?.name || model?.id || "Модель"), icon("chevron-down"));
+  button.disabled = !connected || !state.active || state.ready === false || modelSwitching;
+  const mic = $("onboarding-mic");
+  if (mic) {
+    mic.hidden = !voiceIsAvailable(state.voice?.phase);
+    const recording = state.voice?.phase === "recording";
+    mic.disabled = !connected || !state.active || state.active.readOnly || state.voice?.phase === "transcribing";
+    mic.replaceChildren(icon(recording ? "stop" : "mic"));
+    mic.title = recording ? "Закончить запись" : "Наговорить";
+    mic.setAttribute("aria-label", mic.title);
+  }
+  const send = $("onboarding-send");
+  if (send) send.disabled = !$("onboarding-prompt-input").value.trim() || onboardingBusy || ["starting", "recording", "transcribing"].includes(state.voice?.phase);
+  updateOnboarding();
+}
+
+
+function wireOnboarding() {
+  const node = onboardingNode();
+  if (!node) return;
+  $("onboarding-open-projects").onclick = () => {
+    hideOnboarding();
+    navigate("projects");
+  };
+  $("onboarding-new-project").onclick = () => showOnboardingName(false);
+  $("onboarding-name-back").onclick = () => showOnboardingStep("start");
+  $("onboarding-create").onclick = () => onboardingEnterProject($("onboarding-name-input").value, "");
+  $("onboarding-name-input").onkeydown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onboardingEnterProject($("onboarding-name-input").value, "");
+    } else if (event.key === "Escape") {
+      showOnboardingStep("start");
+    }
+  };
+  $("onboarding-prompt-input").oninput = () => {
+    const area = $("onboarding-prompt-input");
+    area.style.height = "auto";
+    area.style.height = `${Math.min(area.scrollHeight, 240)}px`;
+    $("onboarding-send").disabled = !area.value.trim() || onboardingBusy;
+    onboarding.typed();
+  };
+  $("onboarding-prompt-input").onkeydown = (event) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      if (state.voice?.phase === "recording") {
+        run("Завершаю запись…", () => api("voice", { chat: state.active?.id }, 20000));
+        return;
+      }
+      if (!$("onboarding-send").disabled) sendOnboardingPrompt($("onboarding-prompt-input").value);
+    }
+  };
+  $("onboarding-send").onclick = () => sendOnboardingPrompt($("onboarding-prompt-input").value);
+  $("onboarding-model").onclick = () => loadOnboardingModels();
+  $("onboarding-mic").onclick = () => {
+    voiceTarget = "onboarding";
+    if (state.voice?.phase === "recording") onboarding.dictated();
+    run("Переключаю микрофон…", async () => {
+      if (["installing", "downloading", "loading"].includes(state.voice?.phase)) {
+        $("voice-setup").classList.add("highlight");
+        setTimeout(() => $("voice-setup").classList.remove("highlight"), 2500);
+        throw new Error("Дождитесь загрузки голосовой модели.");
+      }
+      await api("voice", { chat: state.active?.id }, 20000);
+    });
+  };
+  $("onboarding-send").disabled = true;
+}
+
 /* ============================== boot / events ============================== */
 
 async function loadCatalog() {
@@ -478,7 +817,7 @@ async function loadCatalog() {
 function connectEvents() {
   clearTimeout(reconnectTimer);
   if (source) source.close();
-  source = new EventSource("/api/events");
+  source = new EventSource("/api/events?tab=" + tabId);
   source.onopen = () => {
     connected = true;
     reconnectAttempts = 0;
@@ -529,15 +868,18 @@ function renderConnection() {
 async function boot() {
   hydrateIcons();
   wireChrome();
+  if (history.state?.workspaceOpen) onboardingNode().hidden = true;
+  else showOnboarding();
   renderRoute();
   renderProgress();
   beginTask("Подключаюсь к pi…");
   try {
     const token = location.hash.slice(1);
     if (token) {
-      await api("auth", { token }, 15000);
+      await api("auth", { token, tab: tabId }, 15000);
       history.replaceState(null, "", location.pathname);
     }
+    connectEvents();
     await loadCatalog();
   } catch (error) {
     catalogError = error.message;
@@ -547,7 +889,7 @@ async function boot() {
     booting = false;
     endTask();
   }
-  connectEvents();
+  refreshOnboardingChoices();
 }
 
 /* ============================== chrome ============================== */
@@ -579,6 +921,8 @@ function wireChrome() {
   $("confirm-exit").onclick = () =>
     run("Завершаю работу…", async () => {
       await api("close", {}, 15000);
+      allowUnload = true;
+      clearTimeout(reconnectTimer);
       source?.close();
       connected = false;
       $("exit-dialog").close();
@@ -836,6 +1180,7 @@ function wireChrome() {
   };
   $("draft").oninput = () => {
     store(state.active?.id, $("draft").value);
+    onboarding.typed();
     autoGrow();
     renderStatus();
   };
@@ -866,6 +1211,7 @@ function wireChrome() {
   };
   const toggleVoice = (target) => {
     voiceTarget = target;
+    if (target === "chat" && state.voice?.phase === "recording") onboarding.dictated();
     return run("Переключаю микрофон…", async () => {
       if (["installing", "downloading", "loading"].includes(state.voice?.phase)) {
         $("voice-setup").classList.add("highlight");
@@ -911,7 +1257,41 @@ function wireChrome() {
   window.addEventListener("resize", () => {
     if (modelMenu.matches(":popover-open")) positionModels();
   });
-  window.addEventListener("beforeunload", () => store(state.active?.id, $("draft").value));
+  const reloadDialog = $("reload-dialog");
+  function askReload() {
+    if (!allowUnload && !reloadDialog.open) reloadDialog.showModal();
+  }
+  $("reload-page").onclick = askReload;
+  $("cancel-reload").onclick = () => reloadDialog.close();
+  $("confirm-reload").onclick = () => {
+    allowUnload = true;
+    location.reload();
+  };
+  window.addEventListener("keydown", (event) => {
+    if (!event.cancelable || event.altKey) return;
+    if (event.key === "F5" || ((event.ctrlKey || event.metaKey) && event.code === "KeyR")) {
+      event.preventDefault();
+      askReload();
+    }
+  }, true);
+  window.addEventListener("beforeunload", (event) => {
+    store(state.active?.id, $("draft").value);
+    if (allowUnload) return;
+    event.preventDefault();
+    event.returnValue = true;
+  });
+  window.addEventListener("pagehide", () => {
+    clearTimeout(reconnectTimer);
+    source?.close();
+    navigator.sendBeacon("/api/tab-left", JSON.stringify({ tab: tabId }));
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      tabId = crypto.randomUUID();
+      allowUnload = false;
+      connectEvents();
+    }
+  });
 
   $("folder-path-form").onsubmit = (event) => {
     event.preventDefault();
@@ -947,6 +1327,7 @@ function wireChrome() {
   }
   renderAttachments();
   wireDropZone();
+  wireOnboarding();
 }
 
 function setTheme(value, persist = true) {
@@ -1455,6 +1836,7 @@ function setBreadcrumb(title) {
 
 function renderRoute() {
   if (page === "chat" && !state.active) page = "chats";
+  updateOnboarding();
   if (page !== "projects" && page !== "chats") hideFloatingPager();
   updateImageBadge();
   const chatPage = page === "chat" && state.active;
@@ -1816,7 +2198,7 @@ function renderCreatePage() {
   back.onclick = () => navigate("projects");
   const root = pageShell("Новый проект", "Для файлов задачи будет создана отдельная папка.");
   root.prepend(back);
-  const form = el("form", null, "form");
+  const form = el("form", null, "form create-project-form");
   const label = el("label", "Название проекта");
   label.htmlFor = "project-name";
   const input = el("input");
@@ -1828,33 +2210,62 @@ function renderCreatePage() {
   const error = el("div", null, "form-error");
   error.setAttribute("role", "alert");
   const actions = el("div", null, "form-actions");
-  const submit = el("button", "Новый проект", "button primary");
+  const submit = el("button", "Создать проект", "button create-project-button");
+  submit.id = "create-project-submit";
   submit.type = "submit";
   const cancel = el("button", "Отмена", "button");
   cancel.type = "button";
   cancel.onclick = () => navigate("projects");
-  actions.append(submit, cancel);
+  actions.append(cancel, submit);
   form.append(label, input, error, actions);
   form.onsubmit = (event) => {
     event.preventDefault();
+    if (submit.disabled || projectCreationInFlight) return;
     if (!input.value.trim()) {
       error.textContent = "Введите название проекта.";
       input.focus();
       return;
     }
     submit.disabled = true;
+    cancel.disabled = true;
+    input.disabled = true;
+    submit.setAttribute("aria-busy", "true");
+    submit.classList.add("is-loading");
+    const spinner = el("span", null, "project-create-spinner");
+    spinner.setAttribute("aria-hidden", "true");
+    submit.replaceChildren(spinner, el("span", "Создать проект"));
+    onboarding.projectLoading(true);
+    projectCreationInFlight = true;
+    let creationTimer;
+    const minimumLoading = new Promise((resolve) => { creationTimer = setTimeout(resolve, 5000); });
     run("Создаю проект…", async () => {
-      const next = await api("create-project", { name: input.value, fast: true }, 45000);
-      applyState(next);
+      const [next] = await Promise.all([
+        api("create-project", { name: input.value, fast: true }, 45000),
+        minimumLoading,
+      ]);
+      projectCreationInFlight = false;
+      // Events may finish connecting the chat during the loading animation.
+      const created = state.active?.id && state.active.id === next.active?.id ? state : next;
+      applyState(created);
       page = "chat";
-      projectId = next.active?.projectId || null;
+      projectId = created.active?.projectId || null;
       loadCatalog().catch(() => {});
       renderRoute();
     }).finally(() => {
+      clearTimeout(creationTimer);
+      projectCreationInFlight = false;
       submit.disabled = false;
+      cancel.disabled = false;
+      input.disabled = false;
+      submit.removeAttribute("aria-busy");
+      submit.classList.remove("is-loading");
+      submit.textContent = "Создать проект";
+      onboarding.projectLoading(false);
     });
   };
   root.append(form);
+  onboarding.bindProject(input, submit);
+  updateOnboarding();
   input.focus();
 }
 
@@ -3496,6 +3907,7 @@ function sendMessage(text) {
   const items = [...attachments];
   const value = buildOutgoingText(visible, items);
   if (!value || !state.active || !canQueue()) return;
+  onboarding.submitted();
   const chat = state.active.id;
   attachments = [];
   renderAttachments();
@@ -3509,6 +3921,7 @@ function sendMessage(text) {
       showError("");
     })
     .catch((error) => {
+      onboarding.submitted(false);
       if (!$("draft").value) {
         $("draft").value = visible;
         store(chat, visible);
@@ -3566,6 +3979,22 @@ function forkMessage(index, text) {
 
 /* ============================== status ============================== */
 
+function updateOnboarding() {
+  const wizard = onboardingVisible();
+  const wizardName = wizard && !$("onboarding-name").hidden;
+  const wizardPrompt = wizard && !$("onboarding-prompt").hidden;
+  onboarding.update({
+    page: wizardName ? "create" : wizardPrompt ? "chat" : wizard ? "welcome" : page,
+    chatId: state.active?.id, busy: Boolean(state.busy), loading: Boolean(state.loading || pending),
+    connected, readOnly: Boolean(state.active?.readOnly),
+    hasMessages: !wizardPrompt && Boolean(state.messages?.some((message) => message.role === "user")),
+    voicePhase: state.voice?.phase, voiceTarget: wizardPrompt ? "chat" : imagePanelOpen ? voiceTarget : "chat",
+    imageOpen: imageComposeOpen || imagePanelOpen,
+    wizard: wizardPrompt,
+    elements: wizardPrompt ? { draft: "onboarding-prompt-input", composer: "onboarding-prompt", send: "onboarding-send", mic: "onboarding-mic" } : null,
+  });
+}
+
 function elapsedSeconds() {
   return Math.floor((clockBase + (state.busy ? Math.max(0, performance.now() - clockAt) : 0)) / 1000);
 }
@@ -3586,10 +4015,12 @@ function renderStatus() {
   $("attach").hidden = !(page === "chat" && state.active && !readOnly);
   $("attach").disabled = !connected || readOnly;
   $("mic").disabled = !connected || !state.active || readOnly || voice?.phase === "transcribing";
+  $("mic").hidden = !voiceIsAvailable(voice?.phase);
   $("mic").replaceChildren(icon(voice?.phase === "recording" ? "stop" : "mic"));
   $("mic").setAttribute("aria-label", voice?.phase === "recording" ? "Закончить запись" : "Начать диктовку");
   const panelMic = $("panel-mic");
   if (panelMic) {
+    panelMic.hidden = !voiceIsAvailable(voice?.phase);
     panelMic.disabled = !connected || !state.active || readOnly || voice?.phase === "transcribing";
     panelMic.replaceChildren(icon(voice?.phase === "recording" ? "stop" : "mic"));
     panelMic.setAttribute("aria-label", voice?.phase === "recording" ? "Закончить запись" : "Начать диктовку");
@@ -3623,25 +4054,41 @@ function renderStatus() {
   renderConnection();
   updateImageBadge();
   if (imagePanelOpen) renderPanelSkeletons();
+  if (onboardingVisible()) renderOnboardingModel();
+  updateOnboarding();
 }
 
 
 function renderVoice(voice, recording) {
   const panelRecording = Boolean(recording && voiceTarget === "panel" && imagePanelOpen);
-  $("voice-view").hidden = !recording || panelRecording;
+  const onboardRecording = Boolean(recording && voiceTarget === "onboarding" && onboardingVisible());
+  const chatRecording = Boolean(recording && !panelRecording && !onboardRecording);
+  $("voice-view").hidden = !chatRecording;
   $("panel-voice-view").hidden = !panelRecording;
-  $("draft").style.visibility = recording && !panelRecording ? "hidden" : "visible";
+  $("onboarding-voice-view").hidden = !onboardRecording;
+  $("draft").style.visibility = chatRecording ? "hidden" : "visible";
   $("panel-prompt").style.visibility = panelRecording ? "hidden" : "visible";
+  $("onboarding-prompt-input").style.visibility = onboardRecording ? "hidden" : "visible";
   if (recording) {
     const seconds = voice.seconds || 0;
-    const label = panelRecording ? $("panel-voice-label") : $("voice-label");
-    label.textContent =
-      voice.phase === "recording"
-        ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} · Enter — закончить`
+    const label = panelRecording
+      ? $("panel-voice-label")
+      : onboardRecording
+        ? $("onboarding-voice-label")
+        : $("voice-label");
+    const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    label.textContent = onboardRecording
+      ? voice.phase === "recording"
+        ? `Нажмите, чтобы закончить · ${time}`
+        : voice.phase === "transcribing"
+          ? `Распознаю · ${Math.round(voice.percent || 0)}%`
+          : "Включаю микрофон…"
+      : voice.phase === "recording"
+        ? `${time} · Enter — закончить`
         : voice.phase === "transcribing"
           ? `Распознаю · ${Math.round(voice.percent || 0)}%`
           : "Включаю микрофон…";
-    drawWave(voice.levels || [], panelRecording ? "panel-wave" : "wave");
+    drawWave(voice.levels || [], panelRecording ? "panel-wave" : onboardRecording ? "onboarding-wave" : "wave");
   }
   const setup = $("voice-setup");
   setup.replaceChildren();
@@ -3766,7 +4213,7 @@ function loadModels() {
   modelsLoading = true;
   modelsError = "";
   renderModelMenu();
-  api("models", undefined, 20000)
+  return api("models", undefined, 20000)
     .then((result) => {
       modelList = result.models || [];
       modelsLoaded = true;
@@ -4066,7 +4513,23 @@ function applyState(next) {
       typeof imagePanelOpen !== "undefined" &&
       imagePanelOpen &&
       dictation.chat === state.active?.id;
-    if (toPanel) {
+    const toOnboarding =
+      typeof voiceTarget !== "undefined" &&
+      voiceTarget === "onboarding" &&
+      typeof onboardingVisible === "function" &&
+      onboardingVisible() &&
+      dictation.chat === state.active?.id;
+    if (toOnboarding) {
+      const area = $("onboarding-prompt-input");
+      const old = area.value;
+      const text = dictation.replace ? dictation.text : old + (old ? " " : "") + dictation.text;
+      area.value = text;
+      area.style.height = "auto";
+      area.style.height = `${Math.min(area.scrollHeight, 240)}px`;
+      $("onboarding-send").disabled = !text.trim();
+      onboarding.dictated();
+      area.focus();
+    } else if (toPanel) {
       const area = $("panel-prompt");
       const old = area.value;
       const text = dictation.replace ? dictation.text : old + (old ? " " : "") + dictation.text;
@@ -4079,10 +4542,18 @@ function applyState(next) {
       const old = dictation.chat === state.active?.id ? $("draft").value : saved(dictation.chat);
       const text = dictation.replace ? dictation.text : old + (old ? " " : "") + dictation.text;
       store(dictation.chat, text);
-      if (dictation.chat === state.active?.id) $("draft").value = text;
+      if (dictation.chat === state.active?.id) {
+        $("draft").value = text;
+        onboarding.dictated();
+      }
     }
   }
   if (state.active?.projectId) projectId = state.active.projectId;
+  // SSE can announce the new chat before the five-second loading state finishes.
+  if (projectCreationInFlight && (page === "create" || (onboardingVisible() && !$("onboarding-name").hidden))) {
+    updateOnboarding();
+    return;
+  }
   if (state.active && !lastChat) {
     lastChat = state.active.id;
     page = "chat";
@@ -4119,3 +4590,4 @@ function autoGrow() {
 }
 
 boot();
+

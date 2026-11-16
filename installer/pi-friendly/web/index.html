@@ -55,6 +55,9 @@
             <span class="nav-icon" data-icon="wallet" aria-hidden="true"></span>
             <span class="nav-text">Пополнить</span>
           </button>
+          <button type="button" id="reload-page" class="icon-button" title="Перезагрузить страницу" aria-label="Перезагрузить страницу">
+            <span data-icon="refresh" aria-hidden="true"></span>
+          </button>
           <button type="button" id="theme" class="icon-button" title="Тёмная тема" aria-label="Тёмная тема">
             <span data-icon="moon" aria-hidden="true"></span>
           </button>
@@ -125,7 +128,7 @@
                 <button type="button" id="attach" title="Загрузить файлы в папку проекта" aria-label="Загрузить файлы">
                   <span data-icon="attach" aria-hidden="true"></span>
                 </button>
-                <button type="button" id="mic" title="Голосовой ввод с микрофона этого компьютера" aria-label="Начать диктовку">
+                <button type="button" id="mic" title="Голосовой ввод с микрофона этого компьютера" aria-label="Начать диктовку" hidden>
                   <span data-icon="mic" aria-hidden="true"></span>
                 </button>
                 <button type="button" id="queue-send" class="queue-send" hidden title="Добавить в очередь" aria-label="Добавить в очередь">
@@ -246,7 +249,7 @@
               <span id="panel-voice-label"></span>
               <canvas id="panel-wave" aria-label="Уровень звука"></canvas>
             </div>
-            <button type="button" id="panel-mic" class="panel-mic" title="Голосовой ввод" aria-label="Голосовой ввод">
+            <button type="button" id="panel-mic" class="panel-mic" title="Голосовой ввод" aria-label="Голосовой ввод" hidden>
               <span data-icon="mic" aria-hidden="true"></span>
             </button>
           </div>
@@ -330,6 +333,69 @@
     </aside>
   </div>
 
+  <div id="onboarding" class="onboarding">
+    <div class="onboarding-card">
+      <div id="onboarding-start" class="onboarding-step">
+        <div class="onboarding-mark" aria-hidden="true">π</div>
+        <h1>С чего начнём?</h1>
+        <div id="onboarding-loading" class="onboarding-loading" role="status">
+          <span class="onboarding-loading-spinner" aria-hidden="true"></span>
+          <span>Загружаем проекты…</span>
+        </div>
+        <div id="onboarding-projects" class="onboarding-projects" hidden>
+          <section id="onboarding-recent" class="onboarding-recent" hidden aria-label="Последние проекты">
+            <div id="onboarding-recent-list" class="onboarding-recent-list"></div>
+            <button type="button" id="onboarding-open-projects" class="onboarding-recent-all">
+              <span>Все проекты</span><span data-icon="arrow" aria-hidden="true"></span>
+            </button>
+          </section>
+          <div class="onboarding-actions onboarding-choices" hidden>
+            <button type="button" id="onboarding-new-project" class="onboarding-choice">
+              <span class="onboarding-choice-icon" data-icon="plus" aria-hidden="true"></span>
+              <strong>Создать проект</strong>
+              <small>Начать с нуля</small>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="onboarding-name" class="onboarding-step" hidden>
+        <h1 id="onboarding-name-title">Как назовем ваш проект?</h1>
+        <p id="onboarding-name-subtitle">Название можно будет изменить позже.</p>
+        <label class="sr-only" for="onboarding-name-input">Название проекта</label>
+        <input id="onboarding-name-input" class="onboarding-input" maxlength="60" autocomplete="off" placeholder="Например, сайт пекарни">
+        <div id="onboarding-name-error" class="onboarding-error" role="alert"></div>
+        <div class="onboarding-actions">
+          <button type="button" id="onboarding-create" class="onboarding-button primary">Создать проект</button>
+          <button type="button" id="onboarding-name-back" class="onboarding-button ghost">Назад</button>
+        </div>
+      </div>
+
+      <div id="onboarding-prompt" class="onboarding-step" hidden>
+        <h1>Что будем создавать?</h1>
+        <p>Напишите текстом или наговорите голосом.</p>
+        <div class="onboarding-prompt-wrap">
+          <label class="sr-only" for="onboarding-prompt-input">Описание задачи</label>
+          <textarea id="onboarding-prompt-input" rows="4" placeholder="Опишите задачу или идею…"></textarea>
+          <div id="onboarding-voice-view" hidden>
+            <span id="onboarding-voice-label"></span>
+            <canvas id="onboarding-wave" aria-label="Уровень звука"></canvas>
+          </div>
+          <button type="button" id="onboarding-mic" class="onboarding-mic" title="Наговорить" aria-label="Наговорить" hidden>
+            <span data-icon="mic" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div id="onboarding-prompt-error" class="onboarding-error" role="alert"></div>
+        <div class="onboarding-prompt-foot">
+          <button type="button" id="onboarding-model" class="onboarding-model" aria-haspopup="dialog">Модель</button>
+          <button type="button" id="onboarding-send" class="onboarding-send">
+            <span>Отправить</span><span data-icon="arrow-up" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="ui-hint" role="status" hidden></div>
   <div id="drop-overlay" class="drop-overlay" hidden>
     <div class="drop-card">
@@ -338,6 +404,15 @@
       <small>Прикрепим их к сообщению</small>
     </div>
   </div>
+
+  <dialog id="reload-dialog" aria-labelledby="reload-heading">
+    <h2 id="reload-heading">Перезагрузить страницу?</h2>
+    <p>Pi продолжит работу. Вы вернётесь в текущий сеанс.</p>
+    <div class="dialog-actions">
+      <button type="button" id="cancel-reload" autofocus>Отмена</button>
+      <button type="button" id="confirm-reload">Перезагрузить</button>
+    </div>
+  </dialog>
 
   <dialog id="exit-dialog">
     <h2>Выйти из Просто pi?</h2>
