@@ -6,6 +6,7 @@ import {pickProjectFolder,pickChatFiles} from './folder-picker.mjs';
 import {createModelPreference} from './model-preference.mjs';
 import {createHostBridge} from './web-host.mjs';
 import {startWebServer} from './web-server.mjs';
+import {canAutoOpen,launchBrowser} from './browser-start.mjs';
 import {createRpc} from './web-rpc.mjs';
 import {createTitleGenerator, createImageTitleGenerator, finalImageTitle} from './title.mjs';
 import {spawn} from 'node:child_process';
@@ -64,33 +65,43 @@ export default function friendly(pi: ExtensionAPI) {
   pi.on('session_start',async(_event,ctx)=>{const model=modelPreference.resolve(ctx.modelRegistry.getAvailable());if(model)await pi.setModel(model);});
   const preferencePath = join(getAgentDir(), "friendly-ui.json");
   const projects=createProjectStore({root:join(homedir(),"Documents","AI DIY Projects"),registry:join(getAgentDir(),"friendly-projects.jsonl"),SessionManager});
-  let web: any, opening: Promise<any> | undefined, unlockTerminal: (()=>void) | undefined;
+  let web: any, launching: Promise<void> | undefined, sessionGeneration=0, unlockTerminal: (()=>void) | undefined;
   const hostObservers=new Set<(event:any)=>void>();
   routerProgress(pi,{onSnapshot:(progress:any,ctx:any)=>{const event={type:'friendly_router_progress',progress};if(process.env.PI_FRIENDLY_WEB_CHILD==='1'&&ctx?.mode==='rpc')process.stderr.write('PI_FRIENDLY_PROGRESS '+JSON.stringify(event)+'\n');else for(const emit of hostObservers)emit(event);}});
   for(const type of ['agent_start','agent_end','agent_settled','message_start','message_update','message_end','tool_execution_start','tool_execution_update','tool_execution_end'] as const)pi.on(type,(event:any)=>{for(const emit of hostObservers)emit(event);});
-  const openWeb=async(ctx: any, voice: any, getHostStatuses: any=()=>[])=>{
+  const launchWeb=async(ctx: any, voice: any, getHostStatuses: any=()=>[])=>{
+    const generation=sessionGeneration;
     if(process.env.PI_FRIENDLY_WEB_CHILD==='1')return;
     if((!web||web.closed)&&!ctx.isIdle())throw new Error('Сначала дождитесь ответа или остановите его.');
     if((!web||web.closed)&&voice&&['starting','recording','transcribing'].includes(voice.state.phase))throw new Error('Сначала завершите диктовку.');
     if(!web||web.closed){
-      opening??=startWebServer({billing,projects,listSessions:()=>SessionManager.listAll(),readSession:(path: string)=>SessionManager.open(path).buildSessionContext().messages,
+      const started=await startWebServer({billing,projects,listSessions:()=>SessionManager.listAll(),readSession:(path: string)=>SessionManager.open(path).buildSessionContext().messages,
         makeHostRpc:({onEvent}:any)=>createHostBridge({pi,ctx,observers:hostObservers,onEvent}),
         pickProjectFolder,pickChatFiles,sessionDirFor:(cwd:string)=>SessionManager.create(cwd).getSessionDir(),generateImage:async(options:any)=>{const result=await runImageTool(options,options.cwd,await getConnection(),options.signal);await applyImageTitle(result,options.prompt,ctx,options.cwd);void billing.refresh();return result;},onExit:()=>ctx.shutdown(),canExit:()=>ctx.isIdle(),getPreferredModel:()=>modelPreference.resolve(ctx.modelRegistry.getAvailable()),onModelSelected:(model:any)=>modelPreference.save(model),
         getHostStatuses,models:()=>ctx.modelRegistry.getAvailable(),hostSession:()=>ctx.sessionManager.getSessionFile(),voice,
         generateTitle:createTitleGenerator({complete:(model:any,context:any,options:any)=>ctx.modelRegistry.complete(model,context,options),resolveModel:()=>modelPreference.resolve(ctx.modelRegistry.getAvailable())||ctx.model}),
         makeRpc:(options: any)=>createRpc({...options,cli:join(getPackageDir(),'dist','bundle','cli.js'),model:modelPreference.resolve(ctx.modelRegistry.getAvailable())||ctx.model})});
-      try{web=await opening;}finally{opening=undefined;}
+      if(generation!==sessionGeneration){await started.close();return;}
+      web=started;
     }
+    const server=web;
+    try{await launchBrowser(server.url,server.browserReady);}
+    catch(error){
+      if(generation!==sessionGeneration)return;
+      if(!unlockTerminal){web=undefined;await server.close();}
+      throw error;
+    }
+    if(generation!==sessionGeneration||server.closed)return;
     unlockTerminal??=ctx.ui.onTerminalInput?.((data:string)=>{if(!web||web.closed)return;if(data==='\r')void openWeb(ctx,voice,getHostStatuses).catch((error:any)=>ctx.ui.notify(error.message,'error'));return {consume:true};});
-    const url=web.url;
-    try{await new Promise<void>((resolve,reject)=>{
-      const child=process.platform==='win32'?spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{windowsHide:true,stdio:'ignore'}):spawn(process.platform==='darwin'?'open':'xdg-open',[url],{stdio:'ignore'});
-      child.once('error',reject);child.once('spawn',()=>{child.unref();resolve();});
-    });}catch(error){await web?.close();unlockTerminal?.();unlockTerminal=undefined;throw error;}
     ctx.ui.notify('Веб-интерфейс открыт в браузере. Оставьте pi запущенным.','info');
   };
-  pi.on('session_shutdown',async()=>{await web?.close();web=undefined;unlockTerminal?.();unlockTerminal=undefined;});
-  installFriendly(pi, { billing,openExternal,openWeb, isWebActive:()=>Boolean(web&&!web.closed), copyToClipboard, readClipboardText, sliceByColumn, matchesKey, truncate: truncateToWidth, measure: visibleWidth,
+  const openWeb=(ctx:any,voice:any,getHostStatuses:any=()=>[])=>{
+    if(launching)return launching;
+    const task:Promise<void>=launchWeb(ctx,voice,getHostStatuses).finally(()=>{if(launching===task)launching=undefined;});
+    launching=task;return task;
+  };
+  pi.on('session_shutdown',async()=>{sessionGeneration++;launching=undefined;const server=web;web=undefined;unlockTerminal?.();unlockTerminal=undefined;await server?.close();});
+  installFriendly(pi, { billing,openExternal,canAutoOpen,openWeb, isWebActive:()=>Boolean(unlockTerminal&&web&&!web.closed), copyToClipboard, readClipboardText, sliceByColumn, matchesKey, truncate: truncateToWidth, measure: visibleWidth,
     makeInput: () => new Input(),
     createVoice: callbacks => createVoiceService({root:join(getAgentDir(),'friendly-voice'),...callbacks}),
     makeEditor: (tui, theme, keys) => new CustomEditor(tui, theme, keys),

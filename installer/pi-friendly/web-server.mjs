@@ -18,6 +18,8 @@ import {stripAttachments} from './web/attachments.js';
 export {publicMessage,publicMessages} from './web-messages.mjs';
 export async function startWebServer({billing,projects,listSessions,readSession,makeRpc,makeHostRpc,getHostStatuses=()=>[],models=()=>[],hostSession=()=>undefined,voice,port=0,onExit=()=>{},canExit=()=>true,getPreferredModel=()=>undefined,onModelSelected=()=>{},pickProjectFolder,generateTitle,pickChatFiles,sessionDirFor,dropDir,generateImage}){
  const token=randomBytes(32).toString('hex'),cookie='pf_'+randomBytes(6).toString('hex'),clients=new Set();
+ let confirmBrowser;
+ const browserReady=new Promise(resolve=>{confirmBrowser=resolve;});
  let rpc,active,loading=false,navigating=false,disposed=false,allProjects=[],allSessions=[],generation=0,publishTimer,voiceOwned=false,dropRoot;
  let state={active:null,messages:[],busy:false,loading:false,ready:false,error:null,notice:'',statuses:{},widgets:{},questions:[],queue:{steering:[],followUp:[]},voice:voice?.state||null,dictation:null};
  const messageVersions=new Map();
@@ -302,7 +304,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
    if(req.method==='POST'&&url.pathname==='/api/auth'){
     const data=await body(req),supplied=Buffer.from(String(data.token||'')),expected=Buffer.from(token);
     if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected)){reply(403,{error:'Откройте веб-интерфейс кнопкой в pi.'});return;}
-    res.setHeader('Set-Cookie',`${cookie}=${token}; HttpOnly; SameSite=Strict; Path=/`);reply(200,{ok:true});return;
+    res.setHeader('Set-Cookie',`${cookie}=${token}; HttpOnly; SameSite=Strict; Path=/`);reply(200,{ok:true});confirmBrowser(true);return;
    }
    if(url.pathname.startsWith('/api/')){
     if(!(req.headers.cookie||'').split(';').some(v=>v.trim()===`${cookie}=${token}`)){reply(401,{error:'Откройте веб-интерфейс кнопкой в pi.'});return;}
@@ -640,5 +642,5 @@ export async function startWebServer({billing,projects,listSessions,readSession,
  const heartbeat=setInterval(()=>{for(const res of clients)res.write(': heartbeat\n\n');state.questions=state.questions.filter(q=>!q.expires||q.expires>Date.now());},15000);heartbeat.unref();
  async function close(){if(disposed)return;disposed=true;generation++;unsub?.();unsubBilling?.();if(voiceOwned)voice?.cancel();clearInterval(heartbeat);clearTimeout(publishTimer);for(const client of clients)client.end();clients.clear();server.close();server.closeIdleConnections?.();await rpc?.dispose();}
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});origin=`http://127.0.0.1:${server.address().port}`;
- return {url:origin+'/#'+token,origin,close,get closed(){return disposed;}};
+ return {url:origin+'/#'+token,origin,browserReady,async close(){confirmBrowser(false);await close();},get closed(){return disposed;}};
 }

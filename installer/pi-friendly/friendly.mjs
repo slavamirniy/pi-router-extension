@@ -324,7 +324,9 @@ export function installFriendly(pi, rendering) {
       });
     }
     clearTimeout(startupTimer);
-    // Project hub requires a deliberate project choice before a first prompt.
+    if (rendering.canAutoOpen?.({reason:_event?.reason,mode:ctx.mode})) {
+      startupTimer=setTimeout(()=>{if(!stopped && ctx.isIdle())void safe(ctx,()=>rendering.openWeb(ctx,voice,statuses))();},0);
+    }
   });
   for (const name of ["message_start","message_update","message_end"]) pi.on(name, event => {
     if(event.message?.role === "assistant" || event.message?.role === "user") view.live=event.message;
