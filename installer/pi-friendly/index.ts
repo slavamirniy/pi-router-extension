@@ -27,7 +27,7 @@ export default function friendly(pi: ExtensionAPI) {
   };
   const billing=createBilling({receiptFile:join(getAgentDir(),'purchase-consents.jsonl'),getConnection});
   pi.registerTool({
-    name:'generate_image',label:'Создать изображение',
+    name:'generate_image',label:'Новое изображение',
     description:'Generate an image from a description, or edit a project image using its relative path. Uses a paid image credit operation. Use only when the user asks to generate or edit an image. Optional size must be one of the supported image sizes.',
     parameters:Type.Object({
       prompt:Type.String(),

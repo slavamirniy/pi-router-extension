@@ -1157,8 +1157,8 @@ function renderRecentProjects() {
   list.replaceChildren();
   const create = el("button", null, "recent-project recent-create");
   create.type = "button";
-  create.title = "Создать новый проект";
-  create.append(icon("plus"), el("span", "Создать проект", "recent-project-name"));
+  create.title = "Новый проект";
+  create.append(icon("plus"), el("span", "Новый проект", "recent-project-name"));
   create.onclick = () => openCreateProject();
   list.append(create);
   if (!projects.length) return;
@@ -1198,8 +1198,8 @@ function renderRecentProjects() {
     const nested = el("div", null, "recent-chats");
     const add = el("button", null, "recent-chat recent-chat-create");
     add.type = "button";
-    add.title = "Создать чат в проекте";
-    add.append(icon("plus"), el("span", "Создать чат", "recent-chat-name"));
+    add.title = "Новый чат в проекте";
+    add.append(icon("plus"), el("span", "Новый чат", "recent-chat-name"));
     add.onclick = (event) => {
       event.stopPropagation();
       projectId = project.id;
@@ -1258,9 +1258,9 @@ function renderBranches() {
   list.replaceChildren();
   const create = el("button", null, "branch-row branch-create");
   create.type = "button";
-  create.title = "Создать новый чат";
+  create.title = "Новый чат";
   create.disabled = Boolean(state.busy);
-  create.append(icon("plus"), el("span", "Создать чат", "branch-name"));
+  create.append(icon("plus"), el("span", "Новый чат", "branch-name"));
   create.onclick = () => newBranch();
   list.append(create);
   for (const chat of project.chats || []) {
@@ -1670,7 +1670,7 @@ function renderProjectsPage() {
       create.type = "button";
       create.append(icon("plus"));
       const copy = el("span", null, "row-copy");
-      copy.append(el("strong", "Создать проект"));
+      copy.append(el("strong", "Новый проект"));
       create.append(copy);
       create.onclick = () => openCreateProject();
       list.append(create);
@@ -1744,7 +1744,7 @@ function renderChatsPage(project) {
     create.disabled = Boolean(state.busy);
     create.append(icon("plus"));
     const createCopy = el("span", null, "row-copy");
-    createCopy.append(el("strong", "Создать чат"));
+    createCopy.append(el("strong", "Новый чат"));
     create.append(createCopy);
     create.onclick = () => newBranch();
     list.append(create);
@@ -1828,7 +1828,7 @@ function renderCreatePage() {
   const error = el("div", null, "form-error");
   error.setAttribute("role", "alert");
   const actions = el("div", null, "form-actions");
-  const submit = el("button", "Создать проект", "button primary");
+  const submit = el("button", "Новый проект", "button primary");
   submit.type = "submit";
   const cancel = el("button", "Отмена", "button");
   cancel.type = "button";
@@ -2030,7 +2030,7 @@ function renderMessages() {
           };
           const branch = el("button", null, "message-control");
           branch.type = "button";
-          branch.title = "Создать ветку от этого сообщения (новый чат)";
+          branch.title = "Новый чат от этого сообщения";
           branch.append(icon("branch"), el("span", "Ветка отсюда"));
           branch.onclick = () => forkMessage(index, "");
           const copy = el("button", null, "message-control");
@@ -2202,7 +2202,7 @@ function editBox(message, index) {
     renderedSignature = "";
     renderMessages();
   };
-  const save = el("button", "Создать ветку", "button primary");
+  const save = el("button", "Новая ветка", "button primary");
   save.type = "button";
   save.onclick = () => {
     const text = textarea.value.trim();

@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
-  "revision": "867def3b54b2f28128a81169589c05c09721c5d2",
+  "revision": "dea3ac11121d655aab207e7addb0dd3ee8507977",
   "version": "0.14.3",
   "embeddedRouter": true,
   "files": {
@@ -17,7 +17,7 @@
     "friendly.mjs": "67b30dff0d4f9985ee13bb202a53facbd5dc3e75fcb384e4228fa689f453f32b",
     "hover.mjs": "1e7a997b044de13322ef46b2332ed010c1e630ad161ef7bc3cd94b2bc5dcad48",
     "image-tool.mjs": "958bff597bb371eed6815a07dadcecf2b412714a72b213ea6a28b454a184f2ff",
-    "index.ts": "28f33f282569fa39e761c42a9248afe855959553188b3299748ea06142393ea6",
+    "index.ts": "ab72df94f74916d932f1592efb6f6f7bd074679c3a06fc64db8ee061b4f0ac91",
     "legal.mjs": "4863b553ef2e4ac9717093be4a42411522d15520a7d9e2d54a8ae66afe1dc938",
     "menu.mjs": "9ca8cadc393640c5b8982db2348ed6afa188875d02b8e8fb9a5e1c5deb766c19",
     "model-picker.mjs": "b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689",
@@ -44,7 +44,7 @@
     "web-rpc.mjs": "495309052bfc3016a397cb32da788968fc428bc6d9cad3e9bf9b1618458b857f",
     "web-server.mjs": "4718a320787f48c3308689185c535be84fe9056e90a8e032200c9ef25a15eaa8",
     "web/app.css": "1353715cd49283b29fd97b59f660c8ba23e043471967824a9b83a0e9b620548d",
-    "web/app.js": "c0cf27fee7760b289348853248dcc80922137e729deec71526bd77ae5b9810ab",
+    "web/app.js": "968c471b8fb278df6d81bc7be92bb909e2ae0077bf2c37dbcd47587763adcc67",
     "web/attachments.js": "49366bf020821f68ff0f96395d1f8c9e12d8d4b0a8075ecdf65561a095ec8d5e",
     "web/billing-ui.js": "908cdbe3cbb94fa2eb6e3ab8c1c5d22c92d176644ebc45f6e7743639fca2cf17",
     "web/fonts/OFL-Geist-Mono.txt": "cc815ed4fc045f0e991abb10395b7932bd028c6a067deb13316d6002105074e6",
