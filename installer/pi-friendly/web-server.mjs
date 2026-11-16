@@ -35,8 +35,16 @@ export async function startWebServer({billing,projects,listSessions,readSession,
   const tab = tabs.get(id) || {};
   clearTimeout(tab.timer);
   tab.stream = stream;
+  tab.departed = false;
   tabs.set(id, tab);
-  if (stream) navigationDeadline = 0;
+  if (stream) {
+   navigationDeadline = 0;
+   for (const [previousId, previous] of tabs) {
+    if (!previous.departed) continue;
+    clearTimeout(previous.timer);
+    tabs.delete(previousId);
+   }
+  }
   if (!stream) expireTab(id, tab, disconnectGraceMs);
   else stream.once('close', () => {
    if (disposed || tabs.get(id) !== tab || tab.stream !== stream) return;
@@ -344,7 +352,11 @@ export async function startWebServer({billing,projects,listSessions,readSession,
      const tab=tabs.get(id);
      if(tab){
       tab.stream=null;
-      expireTab(id,tab,tabCloseGraceMs);
+      tab.departed=true;
+      if ([...tabs.values()].some(other=>other.stream)) {
+       clearTimeout(tab.timer);
+       tabs.delete(id);
+      } else expireTab(id,tab,tabCloseGraceMs);
      }
      reply(200,{ok:true});return;
     }

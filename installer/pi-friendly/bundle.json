@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
-  "revision": "233cc5b6e553148a4672f02f2e46311df8bd58ee",
+  "revision": "7761335edb0147559099cd7f9bafe0abb9ad71f2",
   "version": "0.16.13",
   "embeddedRouter": true,
   "files": {
@@ -42,7 +42,7 @@
     "web-host.mjs": "858a9ce030934bddc4da6f88759137232eb8a334a9d8f42271e900318d35cb59",
     "web-messages.mjs": "d60d18e2590252b77ba8d8dcf610df7efbba9f80044b89991309d20d6846145b",
     "web-rpc.mjs": "495309052bfc3016a397cb32da788968fc428bc6d9cad3e9bf9b1618458b857f",
-    "web-server.mjs": "e169cba7443ea842ac2a770de5b3cfd491e5de321eedaff72feb70e2ac9ec380",
+    "web-server.mjs": "27603781ac5aac4c701549b146b124f7e9c52f2d113eb9e2b688e4a7905ea105",
     "web/app.css": "c60ea7013154ae457800ce6f3aa69cf45796567ce06a870a60842b88a973f0cb",
     "web/app.js": "cc53b285da726d5965b1d33878720c3ed6c37fd7adbcb87e429b519f18105301",
     "web/attachments.js": "49366bf020821f68ff0f96395d1f8c9e12d8d4b0a8075ecdf65561a095ec8d5e",
