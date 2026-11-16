@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import {usesUiModel} from '../model-preference.mjs';
 
 const MAX_BYTES = 1024 * 1024;
 const VALID_ID = /^[a-zA-Z0-9_.:/-]{1,128}$/;
@@ -142,7 +143,7 @@ export function installModelRefresh(pi, options = {}) {
       }
       const selected = ctx.model && ctx.modelRegistry.find(ctx.model.provider,ctx.model.id);
       const replacement = selected ?? updated.find(p=>p.provider===ctx.model?.provider)?.models[0];
-      if (replacement && ctx.isIdle?.()) {
+      if (replacement && usesUiModel(ctx) && ctx.isIdle?.()) {
         const resolved = ctx.modelRegistry.find(ctx.model.provider,replacement.id);
         if (resolved) await pi.setModel(resolved);
       }
