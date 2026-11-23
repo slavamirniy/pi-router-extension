@@ -3,6 +3,7 @@ import { createVersionManager } from "./message-versions.js";
 import { splitAttachments, buildOutgoingText } from "./attachments.js";
 import { FAVICON_COLORS, windowStatus, windowTitle } from "./chrome.js";
 import { createOnboarding, voiceIsAvailable } from "./onboarding.js";
+import { partitionAssistantParts, workPathTitle } from "./work-path.js";
 
 const billingUI = createBillingUI();
 const versionManager = createVersionManager();
@@ -2407,69 +2408,90 @@ function messageSignature() {
     state.active?.readOnly,
     state.active?.id,
     state.ready,
-    (state.subagents || []).map((entry) => `${entry.id}:${entry.status}:${(entry.items || []).length}`).join("|"),
+    (state.subagents || [])
+      .map((entry) =>
+        [
+          entry.id,
+          entry.status,
+          subagentCurrentLabel(entry),
+          entry.task,
+          (entry.items || []).length,
+          (entry.items || []).at(-1)?.status,
+        ].join(":"),
+      )
+      .join("|"),
   ]);
+}
+
+function subagentToolNote(entry) {
+  if (entry.status === "running") return subagentCurrentLabel(entry);
+  if (entry.status === "done") return "Результат готов";
+  if (entry.status === "error") return "Ошибка";
+  if (entry.status === "stopped") return "Остановлен";
+  return "";
+}
+
+function subagentToolBlock(entry, tool) {
+  const status = entry.status || tool.status || "pending";
+  const card = el("div", null, "subagent-tool " + status);
+  const head = el("div", null, "subagent-tool-head");
+  head.append(el("span", null, "tool-dot"));
+  const name = entry.step ? `${entry.agent} · шаг ${entry.step}` : entry.agent || "Субагент";
+  head.append(el("strong", name, "subagent-tool-name"));
+  const labels = { pending: "ожидает", running: "работает", done: "готово", error: "ошибка", stopped: "остановлен" };
+  head.append(el("span", labels[status] || status, "subagent-tool-state"));
+  if (entry.id) {
+    const open = el("button", "Открыть", "subagent-open");
+    open.type = "button";
+    open.onclick = () => openSubagent(entry.id);
+    head.append(open);
+  }
+  card.append(head);
+  const taskText = entry.task || tool.subagent?.task;
+  if (taskText) {
+    const task = el("p", taskText, "subagent-tool-task");
+    task.title = taskText;
+    card.append(task);
+  }
+  const note = subagentToolNote(entry);
+  if (note) card.append(el("p", note, "subagent-tool-now"));
+  return card;
 }
 
 function subagentToolCard(tool) {
   const ids = new Set((tool.subagents || []).map((entry) => entry.id));
   let entries = (state.subagents || []).filter((entry) => ids.has(entry.id));
   if (!entries.length) entries = tool.subagents || [];
-  const live = entries.some((entry) => entry.status === "running")
-    ? "running"
-    : entries.length && entries.every((entry) => entry.status === "error" || entry.status === "stopped")
-      ? "error"
-      : tool.status || "running";
-  const card = el("div", null, "subagent-tool " + live);
-  const head = el("div", null, "subagent-tool-head");
-  head.append(el("span", null, "tool-dot"));
-  const title =
-    entries.length > 1
-      ? `Субагенты · ${entries.length}`
-      : entries[0]?.agent || tool.subagent?.agent || "Субагент";
-  head.append(el("strong", title, "subagent-tool-name"));
-  const labels = { pending: "ожидает", running: "работает", done: "готово", error: "ошибка", stopped: "остановлен" };
-  head.append(el("span", labels[live] || live || "", "subagent-tool-state"));
-  const openEntry = [...entries].reverse().find((entry) => entry.status === "running") || entries.at(-1);
-  if (openEntry?.id) {
-    const open = el("button", "Открыть", "subagent-open");
-    open.type = "button";
-    open.onclick = () => openSubagent(openEntry.id);
-    head.append(open);
+  const holder = el("div", null, "subagent-tools");
+  if (!entries.length) {
+    holder.append(
+      subagentToolBlock({ agent: tool.subagent?.agent || "Субагент", task: tool.subagent?.task || "", status: tool.status }, tool),
+    );
+    return holder;
   }
-  card.append(head);
-  if (tool.subagent?.task && entries.length <= 1) {
-    const task = el("p", tool.subagent.task, "subagent-tool-task");
-    task.title = tool.subagent.task;
-    card.append(task);
-  }
-  if (entries.length > 1) {
-    for (const entry of entries.slice(0, 4)) {
-      const row = el("div", null, "subagent-tool-row " + (entry.status || "running"));
-      row.append(el("span", null, "tool-dot"), el("span", entry.agent, "subagent-tool-row-name"));
-      const note = subagentShort(entry.current || (entry.status === "done" ? "готово" : entry.error || ""), 80);
-      if (note) row.append(el("span", note, "subagent-tool-row-note"));
-      card.append(row);
-    }
-  } else if (entries[0]) {
-    const note = entries[0].current || (entries[0].status === "done" ? "Результат готов" : entries[0].error || "");
-    if (note) card.append(el("p", subagentShort(note, 160), "subagent-tool-now"));
-  } else if (tool.output) {
-    card.append(el("p", subagentShort(tool.output, 160), "subagent-tool-now"));
-  }
-  return card;
+  for (const entry of entries) holder.append(subagentToolBlock(entry, tool));
+  return holder;
 }
 
 function subagentResultHead(message) {
   const head = el("div", null, "subagent-result-head");
-  head.append(el("span", null, "subagent-dot done"), el("span", "Результат субагента", "subagent-result-title"));
   const entries = message.details?.subagents || [];
-  const last = [...entries].reverse().find((entry) => entry.status === "done") || entries.at(-1);
-  if (last?.id) {
-    const open = el("button", "Открыть", "subagent-open");
-    open.type = "button";
-    open.onclick = () => openSubagent(last.id);
-    head.append(open);
+  if (!entries.length) {
+    head.append(el("span", null, "subagent-dot done"), el("span", "Результат субагента", "subagent-result-title"));
+    return head;
+  }
+  for (const entry of entries) {
+    const row = el("div", null, "subagent-result-row");
+    row.append(el("span", null, "subagent-dot " + (entry.status || "done")));
+    const name = entry.step ? `${entry.agent} · шаг ${entry.step}` : entry.agent;
+    row.append(el("span", name, "subagent-result-title"));
+    if (entry.id) {
+      const open = el("button", "Открыть", "subagent-open");
+      open.type = "button";
+      open.onclick = () => openSubagent(entry.id);
+      row.append(open);
+    }
+    head.append(row);
   }
   return head;
 }
@@ -2486,10 +2508,21 @@ function renderMessages() {
   const messages = state.messages || [];
   let previousAssistant = false;
   let assistantContent = null;
-  let assistantText = "";
+  let assistantParts = null;
+  let assistantKey = "";
   let assistantStreaming = false;
   let assistantRunningTools = false;
   let assistantImageLoaders = 0;
+
+  const appendCopyButton = (text) => {
+    const foot = el("div", null, "assistant-foot");
+    const copy = el("button", null, "copy-btn");
+    copy.type = "button";
+    copy.append(icon("copy"), el("span", "Копировать"));
+    copy.onclick = () => copyText(text);
+    foot.append(copy);
+    assistantContent.append(foot);
+  };
 
   const finishAssistant = (final = false) => {
     if (!assistantContent) return;
@@ -2498,7 +2531,9 @@ function renderMessages() {
       assistantImageLoaders = 0;
     }
     const active = assistantStreaming || (state.busy && (assistantRunningTools || final));
+    const parts = assistantParts || [];
     if (active) {
+      for (const part of parts) assistantContent.append(part.node);
       const quota = Number.isFinite(state.routerProgress?.quota)
         ? `${state.routerProgress.estimated ? "≈" : ""}${state.routerProgress.quota.toLocaleString("ru-RU")} квоты`
         : Number.isFinite(state.billing?.account?.available)
@@ -2512,17 +2547,29 @@ function renderMessages() {
       metaNode.dataset.quota = quota;
       generation.append(metaNode);
       assistantContent.append(generation);
-    } else if (assistantText) {
-      const foot = el("div", null, "assistant-foot");
-      const copy = el("button", null, "copy-btn");
-      copy.type = "button";
-      copy.append(icon("copy"), el("span", "Копировать"));
-      copy.onclick = () => copyText(assistantText);
-      foot.append(copy);
-      assistantContent.append(foot);
+    } else {
+      const { answer, work, extra } = partitionAssistantParts(parts);
+      if (work.length) {
+        const body = el("div", null, "work-path");
+        for (const index of work) body.append(parts[index].node);
+        const details = disclosure(
+          workPathTitle(work.length),
+          body,
+          "work-path-card",
+          null,
+          assistantKey + ":work",
+        );
+        // A turn without final text is all work: show it rather than an empty bubble.
+        if (answer < 0) details.open = true;
+        assistantContent.append(details);
+      }
+      if (answer >= 0) assistantContent.append(parts[answer].node);
+      for (const index of extra) assistantContent.append(parts[index].node);
+      if (answer >= 0) appendCopyButton(parts[answer].text);
     }
     assistantContent = null;
-    assistantText = "";
+    assistantParts = null;
+    assistantKey = "";
     assistantStreaming = false;
     assistantRunningTools = false;
     assistantImageLoaders = 0;
@@ -2608,42 +2655,47 @@ function renderMessages() {
         row.append(mark, content);
         frag.append(row);
         assistantContent = content;
+        assistantParts = [];
+        assistantKey = messageKey;
       }
-      assistantText += (assistantText && message.text ? "\n\n" : "") + (message.text || "");
+      const parts = assistantParts;
       assistantStreaming = message.status === "streaming";
       if (message.role === "custom" && message.customType === "friendly-subagent") {
-        content.append(subagentResultHead(message));
+        const holder = el("div", null, "subagent-result");
+        holder.append(subagentResultHead(message));
         const answer = el("div", null, "answer");
         markdown(answer, message.text || "");
-        content.append(answer);
+        holder.append(answer);
+        parts.push({ kind: "answer", text: message.text || "", node: holder });
         return;
       }
       if (message.thinking) {
         const body = el("div", null, "reasoning-text");
         markdown(body, message.thinking);
-        content.append(
-          disclosure(
+        parts.push({
+          kind: "thinking",
+          node: disclosure(
             message.status === "streaming" && !message.text ? "Размышляет…" : "Размышления",
             body,
             "reasoning",
             message.status === "streaming" ? { label: "идёт", cls: "warn" } : null,
             messageKey + ":thinking",
           ),
-        );
+        });
       }
       const answer = el("div", null, "answer");
       markdown(answer, message.text || "");
-      content.append(answer);
+      parts.push({ kind: "answer", text: message.text || "", node: answer });
       if (message.status === "streaming" && !message.text && !message.thinking && !message.tools?.length) {
         const skeleton = el("div", null, "stream-skeleton");
         skeleton.append(el("span", null, "skeleton w-80"), el("span", null, "skeleton w-60"));
-        content.append(skeleton);
+        parts.push({ kind: "skeleton", node: skeleton });
       }
       for (const tool of message.tools || []) {
         const status = tool.status || "pending";
         if (status === "running" || status === "pending") assistantRunningTools = true;
         if (tool.name === "subagent" && tool.subagent) {
-          content.append(subagentToolCard(tool));
+          parts.push({ kind: "tool", node: subagentToolCard(tool) });
           continue;
         }
         const labels = { pending: "ожидает", running: "выполняется", done: "готово", error: "ошибка", stopped: "остановлено" };
@@ -2656,8 +2708,9 @@ function renderMessages() {
         const label = status === "done"
           ? String(tool.label || "Действие").replace("Создаю файл", "Файл записан").replace("Обновляю файл", "Файл изменён").replace("Читаю файл", "Файл прочитан")
           : tool.label || "Действие";
-        content.append(
-          disclosure(
+        parts.push({
+          kind: "tool",
+          node: disclosure(
             label,
             body,
             "tool-card " + status,
@@ -2668,9 +2721,9 @@ function renderMessages() {
             },
             messageKey + ":tool:" + (tool.id || tool.label || "tool"),
           ),
-        );
+        });
         if (Array.isArray(tool.images) && tool.images.length) {
-          content.append(toolImageGrid(tool.images));
+          parts.push({ kind: "images", node: toolImageGrid(tool.images) });
           if (tool.images.some((image) => !imageImages.some((item) => item.path === image.path))) {
             void refreshImageLibrary();
           }
@@ -2679,30 +2732,32 @@ function renderMessages() {
         }
       }
       if (showFailure) {
-        content.append(
-          disclosure(
+        parts.push({
+          kind: "note",
+          node: disclosure(
             "Не удалось получить ответ · Подробнее",
             el("pre", message.error),
             "message-error",
             null,
             messageKey + ":error",
           ),
-        );
+        });
       }
-      if (message.status === "stopped") content.append(el("p", "Ответ прерван. Полученная часть сохранена.", "stopped-note"));
-      if (message.retained) content.append(el("p", "Сохранённый фрагмент: сервис не вернул его в итоговой истории.", "stopped-note"));
+      if (message.status === "stopped") parts.push({ kind: "note", node: el("p", "Ответ прерван. Полученная часть сохранена.", "stopped-note") });
+      if (message.retained) parts.push({ kind: "note", node: el("p", "Сохранённый фрагмент: сервис не вернул его в итоговой истории.", "stopped-note") });
       if (message.versions?.length) {
         const body = el("div");
         for (const version of message.versions) body.append(el("pre", version.text || version.thinking || ""));
-        content.append(
-          disclosure(
+        parts.push({
+          kind: "versions",
+          node: disclosure(
             "Предыдущий фрагмент ответа · сервис заменил текст",
             body,
             "reasoning",
             null,
             messageKey + ":versions",
           ),
-        );
+        });
       }
       previousAssistant = true;
     }
@@ -4722,13 +4777,6 @@ function subagentList() {
   return Array.isArray(state.subagents) ? state.subagents : [];
 }
 
-function subagentStatus(entry) {
-  if (entry.status === "running") return { label: "работает", cls: "warn" };
-  if (entry.status === "done") return { label: "готово", cls: "ok" };
-  if (entry.status === "stopped") return { label: "остановлен", cls: "" };
-  return { label: "ошибка", cls: "err" };
-}
-
 function subagentStarted(entry) {
   return entry.startedAt || entry.finishedAt || Date.now();
 }
@@ -4741,26 +4789,6 @@ function subagentElapsed(entry) {
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes} мин ${seconds % 60} с`;
   return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
-}
-
-function subagentTokens(value) {
-  const number = Number(value) || 0;
-  if (number < 1000) return String(number);
-  if (number < 10000) return `${(number / 1000).toFixed(1)}k`;
-  if (number < 1000000) return `${Math.round(number / 1000)}k`;
-  return `${(number / 1000000).toFixed(1)}M`;
-}
-
-function subagentUsage(entry) {
-  const usage = entry.usage || {};
-  const parts = [];
-  if (usage.turns) parts.push(`${usage.turns} ${plural(usage.turns, "шаг", "шага", "шагов")}`);
-  if (usage.input) parts.push(`↑${subagentTokens(usage.input)}`);
-  if (usage.output) parts.push(`↓${subagentTokens(usage.output)}`);
-  if (usage.cost) parts.push(`$${Number(usage.cost).toFixed(4)}`);
-  if (usage.contextTokens) parts.push(`ctx:${subagentTokens(usage.contextTokens)}`);
-  if (entry.model) parts.push(entry.model);
-  return parts.join(" · ");
 }
 
 function subagentsSummary(entries) {
@@ -4847,7 +4875,7 @@ function subagentCard(entry) {
   head.append(el("span", null, "subagent-dot"), name, clock);
   card.append(head);
   card.append(el("span", entry.task || entry.agent, "subagent-prompt"));
-  const steps = subagentFeed(entry, 3);
+  const steps = subagentFeed(entry, 1);
   if (steps.length) {
     const list = el("span", null, "subagent-steps");
     list.append(...steps.map(subagentStepRow));
@@ -4892,11 +4920,12 @@ function renderSubagents() {
     entries.map((entry) => [
       entry.id,
       entry.status,
-      entry.current,
+      subagentCurrentLabel(entry),
       entry.task,
       entry.finishedAt,
       (entry.items || []).length,
       (entry.items || []).at(-1)?.status,
+      (entry.items || []).at(-1)?.text,
     ]),
   );
   if (signature !== subagentsSignature) {
@@ -4984,11 +5013,10 @@ function renderSubagentPage() {
   const signature = JSON.stringify([
     entry.id,
     entry.status,
-    entry.current,
-    entry.output,
-    entry.error,
+    subagentCurrentLabel(entry),
     (entry.items || []).length,
     (entry.items || []).at(-1)?.status,
+    (entry.items || []).at(-1)?.text,
   ]);
   const pageNode = $("page");
   if (signature === subagentViewSignature && pageNode.firstChild) {
@@ -5003,18 +5031,13 @@ function renderSubagentPage() {
   const root = el("div", null, "page-inner subagent-view");
   root.append(subagentBackButton());
 
-  const chat = el("div", null, "subagent-chat");
-  const user = el("div", null, "message user");
-  const wrapper = el("div", null, "user-message-wrapper");
-  const bubble = el("div", null, "user-bubble");
-  bubble.append(el("p", entry.task || ""));
-  wrapper.append(bubble);
-  user.append(wrapper);
-  chat.append(user);
-
+  const panelNode = el("div", null, "subagent-panel");
+  const task = el("div", null, "subagent-task");
+  task.append(el("div", "Задача", "subagent-task-label"), el("p", entry.task || ""));
+  panelNode.append(task);
   const work = subagentWorkNode(entry);
-  if (work) chat.append(work);
-  root.append(chat);
+  if (work) panelNode.append(work);
+  root.append(panelNode);
 
   pageNode.replaceChildren(root);
   if (entry.status === "running" && (nearBottom || scroll === 0)) pageNode.scrollTop = pageNode.scrollHeight;

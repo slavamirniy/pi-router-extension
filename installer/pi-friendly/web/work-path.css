@@ -1,0 +1,49 @@
+.work-path-card {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.work-path-card summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 24px;
+  padding: 2px 5px 2px 3px;
+  border-radius: 4px;
+  color: var(--text-2);
+  font: 11px/1.4 var(--mono);
+  cursor: pointer;
+  list-style: none;
+}
+.work-path-card summary::-webkit-details-marker {
+  display: none;
+}
+.work-path-card summary::before {
+  content: "›";
+  color: var(--disabled);
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 80ms linear;
+}
+.work-path-card[open] summary::before {
+  transform: rotate(90deg);
+}
+.work-path-card summary:hover {
+  background: var(--surface);
+}
+.work-path {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 4px;
+  padding-left: 2px;
+}
+.work-path .answer {
+  color: var(--text-2);
+  font-size: 13px;
+}
+.work-path .reasoning,
+.work-path .tool-card {
+  margin: 2px 0;
+}
