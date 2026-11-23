@@ -13,7 +13,7 @@ TASK_PROVIDER="${PI_PROVIDER_NAME:-router}"
 TASK_DEFAULT_MODEL="${PI_DEFAULT_MODEL:-}"
 TASK_CONFIG_DIR="${PI_CODING_AGENT_DIR:-}"
 unset PI_API_KEY PI_BASE_URL PI_PROVIDER_NAME PI_DEFAULT_MODEL
-TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/4d4d46f880bb860b25a24e2bc703bcaa23d4b24c"
+TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/b7b84fd108326ec92e39ef35cd0fd0bb434302f2"
 [[ -n "$TASK_BASE_URL" ]] || { echo 'Set PI_BASE_URL to your API address, including /v1.' >&2; exit 1; }
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -245,7 +245,7 @@ installer/autoupdate/index.ts 80da32f295a23886f76b0ac0d2fd25c2662ce47ceca520bb86
 installer/autoupdate/update.mjs 7dc23c9ade8a379debe873aa230ae6890253ab90a29983f1f3640e73d17843ab
 installer/autoupdate/worker.mjs 069e1ca196a040236a6f77446058c0ceb0581d1677c546e179432c87ecc5bb44
 installer/autoupdate/trust.mjs af4d57b531555bd7102f1bf48dbbded9ad801a85cc9cb319d5e0c6b35859e07f
-installer/pi-friendly/bundle.json 08aa606b97dbc007ee27abb79cf6eef0d13b296babe01304d26c746c7aadfd5e
+installer/pi-friendly/bundle.json 6ded2f40cc9347102021a32a0bdf8bfe9473505a7be300bbfc723b67d1ee0df2
 installer/pi-friendly/LICENSE 7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd
 installer/pi-friendly/activity.mjs 753079e60811b8d61986db4da0a973ea91ea2e6b446095656a1e9650bd345821
 installer/pi-friendly/billing-panel.mjs 626d873c355d466d45c33b190dabaeeae5c5dd7153195421336c292f7019abda
@@ -266,7 +266,7 @@ installer/pi-friendly/menu.mjs 9ca8cadc393640c5b8982db2348ed6afa188875d02b8e8fb9
 installer/pi-friendly/model-picker.mjs b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689
 installer/pi-friendly/model-preference.mjs 91ab8ecfa8c38ab0dc103fadd60de50993d435ebb77a38408a5eb5a220cfd2af
 installer/pi-friendly/mouse.mjs 4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0
-installer/pi-friendly/package.json 6f7283eea046667a8577b66fea2ac016132972c2af4b20f549d10faf79b8ea7c
+installer/pi-friendly/package.json 3d57ccd8fd8b6799b3b863c3e8b719c5ee43348c3a7e0d1afb4c74401b8d3a6d
 installer/pi-friendly/project-form.mjs 990d61dab347a589bfe9c6bdd5f066c082b1d02f1b1487f92d4e41df573bc6c0
 installer/pi-friendly/projects.mjs a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03
 installer/pi-friendly/router/LICENSE 7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710
@@ -294,7 +294,7 @@ installer/pi-friendly/web-rpc.mjs 7d71f7a85c630699db1fa26239e7a3f8794b22d258d932
 installer/pi-friendly/web-server.mjs 6e471247a86dc98c3407e0aa5645f76493c86dea6464d97860e90a4c0a86f315
 installer/pi-friendly/web/ai-diy.png ce353036890960615073158ff65bb5dc392104371e3110e3c1bb42c40f0c83dd
 installer/pi-friendly/web/app.css 114a56a3eab42e5b320ada74d0b5e6da7de26e6fe9606d090c7756a42748d157
-installer/pi-friendly/web/app.js af371497aa2db5f8ccd53b394b129ec7a9f883b1b1d33467c605e41dac6812a3
+installer/pi-friendly/web/app.js 326d37e5452bc934438f48b6bb750095f07007232e38f26fb0aad5fa25d5d359
 installer/pi-friendly/web/attachments.js 49366bf020821f68ff0f96395d1f8c9e12d8d4b0a8075ecdf65561a095ec8d5e
 installer/pi-friendly/web/billing-ui.js 908cdbe3cbb94fa2eb6e3ab8c1c5d22c92d176644ebc45f6e7743639fca2cf17
 installer/pi-friendly/web/chrome.js 6a3018e92ad07fe310d67c10e3f82bde59ef205b920ef5b44289f0805b4d07f8
@@ -309,7 +309,7 @@ installer/pi-friendly/web/message-versions.js b6648f6b4ba3968a4d0df0ba06ba271355
 installer/pi-friendly/web/onboarding.js 69954d60f5549bd20062f05f5fbda253d446a4bcc1de3df3cab99a06c222a7da
 installer/pi-friendly/web/sounds/done.mp3 cfe22294469460f0cef050cbf533c8f66074cc8e63982d7ec0bbb3d2f7b57ab4
 installer/pi-friendly/web/work-path.css 4440113acff6008dcd053a474ad2f013ff69bb2ff25c1b714d7e34dc6e941b11
-installer/pi-friendly/web/work-path.js d9d4cbb840fbc3abf2746d90f29293998e93447d04e6fb8c39718419b11cd82d
+installer/pi-friendly/web/work-path.js cb9f4d5ab49b2df68132ce6b9a77ac264bbb25ba58bcbaf23e7d1ee9a0d5f2ea
 installer/pi-friendly/workspace.mjs d08cbc9e280207dcf05ba038cd164823ab292b3213599423984736b9dc3c2941
 MANIFEST
 printf '%s\0%s\0%s\0%s\0%s\0' "$TASK_API_KEY" "$TASK_BASE_URL" "$TASK_PROVIDER" "$TASK_DEFAULT_MODEL" "$TASK_CONFIG_DIR" | node "$TASK_TMP/installer/configure.mjs"
