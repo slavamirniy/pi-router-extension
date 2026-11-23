@@ -1,6 +1,7 @@
-// Window chrome: page title and favicon follow what the app is doing.
+// Window chrome: the tab title follows the current action, the favicon is a
+// coloured status circle. Nothing else is drawn in the tab icon.
 export const FAVICON_COLORS = {
-  idle: null,
+  idle: "#8b98ab",
   working: "#3b82f6",
   done: "#22c55e",
   error: "#ef4444",
@@ -8,6 +9,7 @@ export const FAVICON_COLORS = {
   loading: "#94a3b8",
 };
 
+export const TITLE_CHARS = 15;
 const ACTIVE_VOICE = ["starting", "recording", "transcribing"];
 
 export function windowStatus({ busy, compacting, voicePhase, loading, error, done } = {}) {
@@ -20,8 +22,20 @@ export function windowStatus({ busy, compacting, voicePhase, loading, error, don
   return { kind: "idle", label: "" };
 }
 
-export function windowTitle(status, chatName) {
-  if (status?.label) return `${status.label} — AI DIY`;
-  const name = String(chatName || "").trim();
-  return name ? `${name} — AI DIY` : "AI DIY";
+// "Чат от «Первое сообщение»" is a generated fallback name; the tab shows the
+// text itself, not the wrapper, and never more than 15 characters.
+export function chatTitle(name, limit = TITLE_CHARS) {
+  let value = String(name || "").replace(/\s+/g, " ").trim();
+  const wrapped = value.match(/^Чат от «(.+)»$/i);
+  if (wrapped) value = wrapped[1].trim();
+  const chars = Array.from(value);
+  if (chars.length <= limit) return value;
+  return chars.slice(0, limit).join("").trimEnd() + "…";
+}
+
+export function windowTitle(status, chatName, fallback) {
+  if (status?.label) return status.label;
+  const name = chatTitle(chatName);
+  if (name) return name;
+  return String(fallback || "").replace(/\s+/g, " ").trim();
 }

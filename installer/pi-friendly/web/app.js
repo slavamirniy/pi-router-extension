@@ -1,7 +1,6 @@
 import { createBillingUI } from "./billing-ui.js";
 import { createVersionManager } from "./message-versions.js";
 import { splitAttachments, buildOutgoingText } from "./attachments.js";
-import { BRAND_ICON } from "./brand-icon.js";
 import { FAVICON_COLORS, windowStatus, windowTitle } from "./chrome.js";
 import { createOnboarding, voiceIsAvailable } from "./onboarding.js";
 
@@ -100,14 +99,6 @@ let doneAt = 0;
 let doneUnread = false;
 let doneTimer = null;
 const faviconCache = new Map();
-const brandImage = new Image();
-let brandReady = false;
-brandImage.onload = () => {
-  brandReady = true;
-  faviconCache.clear();
-  renderWindowChrome();
-};
-brandImage.src = BRAND_ICON;
 let tabId = crypto.randomUUID();
 let allowUnload = false;
 let source;
@@ -4783,15 +4774,65 @@ function subagentsSummary(entries) {
   ].join(" · ");
 }
 
-function subagentNote(entry) {
-  if (entry.status === "running") return entry.current || "Работает…";
-  if (entry.status === "stopped") return "Остановлен";
-  if (entry.status === "error") return entry.error || "Не удалось выполнить задачу";
-  const line = String(entry.output || "")
-    .split("\n")
-    .map((value) => value.trim())
-    .find(Boolean);
-  return line ? line.replace(/^#+\s*/, "") : "Готово";
+function subagentToolLabel(name) {
+  if (name === "bash") return "Запускает команду";
+  if (name === "read") return "Читает файл";
+  if (name === "write") return "Пишет файл";
+  if (name === "edit") return "Правит файл";
+  if (name === "grep") return "Ищет в коде";
+  if (name === "find") return "Ищет файлы";
+  if (name === "ls") return "Смотрит папку";
+  return name ? `Использует ${name}` : "Действие";
+}
+
+function subagentCurrentLabel(entry) {
+  const current = String(entry.current || "");
+  if (/^Запуска/i.test(current)) return "Запускает агента";
+  if (/^(Думает|Размышляет)/i.test(current)) return "Думает";
+  if (/^Готовит ответ/i.test(current)) return "Пишет ответ";
+  if (/^Читает файл/i.test(current)) return "Читает файл";
+  if (/^(Создаёт|Пишет) файл/i.test(current)) return "Пишет файл";
+  if (/^Правит файл/i.test(current)) return "Правит файл";
+  if (/^Команда/i.test(current)) return "Запускает команду";
+  if (/^Ищет файлы/i.test(current)) return "Ищет файлы";
+  if (/^Ищет/i.test(current)) return "Ищет в коде";
+  if (/^Смотрит папку/i.test(current)) return "Смотрит папку";
+  if (/^Действие/i.test(current)) return "Действие";
+  return entry.status === "running" ? "Пишет ответ" : "Работает";
+}
+
+function subagentStepLabel(item) {
+  if (item.type === "thinking") return "Думает";
+  if (item.type === "text") return "Пишет ответ";
+  if (item.type === "tool") return subagentToolLabel(item.name);
+  return "Действие";
+}
+
+function subagentFeed(entry, limit = 0) {
+  const items = Array.isArray(entry.items) ? entry.items : [];
+  const running = entry.status === "running";
+  const current = running ? subagentCurrentLabel(entry) : "";
+  const rows = running ? [{ label: current, status: "running" }] : [];
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (running && item.status === "running") continue;
+    const label = subagentStepLabel(item);
+    if (running && index === items.length - 1 && label === current) continue;
+    rows.push({ label, status: item.status === "error" ? "error" : "done" });
+  }
+  if (!running) {
+    rows.push({
+      label: entry.status === "error" ? "Ошибка" : entry.status === "stopped" ? "Остановлен" : "Готово",
+      status: entry.status === "error" ? "error" : "done",
+    });
+  }
+  return limit > 0 ? rows.slice(0, limit) : rows;
+}
+
+function subagentStepRow(row) {
+  const line = el("span", null, "subagent-step " + row.status);
+  line.append(el("span", null, "tool-dot"), el("span", row.label, "subagent-step-label"));
+  return line;
 }
 
 function subagentCard(entry) {
@@ -4804,7 +4845,14 @@ function subagentCard(entry) {
   const clock = el("span", subagentElapsed(entry), "subagent-time");
   clock.dataset.subagentClock = entry.id;
   head.append(el("span", null, "subagent-dot"), name, clock);
-  card.append(head, el("span", subagentNote(entry), "subagent-note"));
+  card.append(head);
+  card.append(el("span", entry.task || entry.agent, "subagent-prompt"));
+  const steps = subagentFeed(entry, 3);
+  if (steps.length) {
+    const list = el("span", null, "subagent-steps");
+    list.append(...steps.map(subagentStepRow));
+    card.append(list);
+  }
   card.onclick = () => openSubagent(entry.id);
   return card;
 }
@@ -4841,7 +4889,15 @@ function renderSubagents() {
   }
   const area = $("subagents-list");
   const signature = JSON.stringify(
-    entries.map((entry) => [entry.id, entry.status, entry.current, entry.task, entry.finishedAt]),
+    entries.map((entry) => [
+      entry.id,
+      entry.status,
+      entry.current,
+      entry.task,
+      entry.finishedAt,
+      (entry.items || []).length,
+      (entry.items || []).at(-1)?.status,
+    ]),
   );
   if (signature !== subagentsSignature) {
     subagentsSignature = signature;
@@ -4894,16 +4950,6 @@ function subagentBackButton() {
   return button;
 }
 
-function subagentStatusLine(entry) {
-  const status = subagentStatus(entry);
-  const line = el("div", null, "subagent-status-line " + (entry.status || "running"));
-  line.append(el("span", null, "subagent-dot"), el("span", status.label, "subagent-status-word"));
-  const clock = el("span", subagentElapsed(entry), "subagent-status-clock");
-  clock.dataset.subagentViewClock = "1";
-  line.append(clock);
-  return line;
-}
-
 function subagentShort(value, limit = 180) {
   const text = String(value || "")
     .replace(/\s+/g, " ")
@@ -4912,59 +4958,17 @@ function subagentShort(value, limit = 180) {
   return text.slice(0, limit - 1).trimEnd() + "…";
 }
 
-function subagentThinkingNode(entry) {
-  const thinking = (Array.isArray(entry.items) ? entry.items : [])
-    .filter((item) => item.type === "thinking" && item.text)
-    .map((item) => item.text)
-    .join("\n\n")
-    .trim();
-  if (!thinking) return null;
-  const body = el("div", null, "reasoning-text");
-  markdown(body, thinking);
-  return disclosure(
-    entry.status === "running" ? "Размышляет…" : "Размышления",
-    body,
-    "reasoning",
-    entry.status === "running" ? { label: "идёт", cls: "warn" } : null,
-    `${entry.id}:thinking`,
-  );
-}
-
 function subagentWorkNode(entry) {
-  const items = (Array.isArray(entry.items) ? entry.items : []).filter((item) => item.type !== "thinking");
-  if (!items.length) return null;
+  const rows = subagentFeed(entry);
+  if (!rows.length) return null;
   const box = el("div", null, "subagent-work");
-  box.append(el("div", "Ход работы", "subagent-work-title"));
-  for (const item of items) {
-    const tool = item.type === "tool";
-    const row = el("div", null, "subagent-work-row " + (tool ? item.status || "done" : "text"));
-    const text = subagentShort(item.text, tool ? 140 : 200);
-    const line = el("span", text, "subagent-work-text");
-    line.title = String(item.text || "");
-    row.append(el("span", null, "tool-dot"), line);
-    box.append(row);
-  }
+  const head = el("div", null, "subagent-work-head");
+  head.append(el("div", "Ход работы", "subagent-work-title"));
+  const clock = el("span", subagentElapsed(entry), "subagent-work-clock");
+  clock.dataset.subagentViewClock = "1";
+  head.append(clock);
+  box.append(head, ...rows.map(subagentStepRow));
   return box;
-}
-
-function subagentAnswer(entry) {
-  const answer = el("div", null, "answer subagent-answer");
-  if (entry.status === "running") {
-    answer.textContent = subagentShort(entry.current || "Работает…", 200);
-    answer.append(el("span", null, "typing-caret"));
-    return answer;
-  }
-  if (entry.status === "error") {
-    answer.classList.add("error");
-    answer.textContent = entry.error || "Не удалось выполнить задачу.";
-    return answer;
-  }
-  if (entry.status === "stopped") {
-    answer.textContent = "Остановлен пользователем.";
-    return answer;
-  }
-  answer.textContent = "Готово. Результат — в основном чате.";
-  return answer;
 }
 
 function renderSubagentPage() {
@@ -5008,22 +5012,8 @@ function renderSubagentPage() {
   user.append(wrapper);
   chat.append(user);
 
-  const assistant = el("div", null, "message assistant");
-  const mark = el("div", null, "assistant-mark");
-  mark.textContent = "π";
-  const body = el("div", null, "assistant-body");
-  body.append(subagentStatusLine(entry));
-  const thinking = subagentThinkingNode(entry);
-  if (thinking) body.append(thinking);
-  body.append(subagentAnswer(entry));
   const work = subagentWorkNode(entry);
-  if (work) body.append(work);
-  const meta = el("div", null, "subagent-view-meta");
-  const usage = subagentUsage(entry);
-  if (usage) meta.append(el("span", usage));
-  if (meta.childNodes.length) body.append(meta);
-  assistant.append(mark, body);
-  chat.append(assistant);
+  if (work) chat.append(work);
   root.append(chat);
 
   pageNode.replaceChildren(root);
@@ -5035,29 +5025,12 @@ function renderSubagentPage() {
 
 function faviconHref(kind) {
   if (faviconCache.has(kind)) return faviconCache.get(kind);
-  if (!brandReady) return "/ai-diy-64.png";
-  const canvas = document.createElement("canvas");
-  canvas.width = 64;
-  canvas.height = 64;
-  const context = canvas.getContext("2d");
-  if (!context) return "/ai-diy-64.png";
-  if (typeof context.roundRect === "function") {
-    context.beginPath();
-    context.roundRect(0, 0, 64, 64, 14);
-    context.clip();
-  }
-  context.drawImage(brandImage, 0, 0, 64, 64);
-  const color = FAVICON_COLORS[kind];
-  if (color) {
-    context.beginPath();
-    context.arc(51, 51, 11, 0, Math.PI * 2);
-    context.fillStyle = color;
-    context.fill();
-    context.lineWidth = 6;
-    context.strokeStyle = "#0b1a33";
-    context.stroke();
-  }
-  const href = canvas.toDataURL("image/png");
+  const color = FAVICON_COLORS[kind] || FAVICON_COLORS.idle;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">` +
+    `<circle cx="32" cy="32" r="24" fill="${color}"/>` +
+    `<circle cx="32" cy="32" r="24" fill="none" stroke="rgba(0,0,0,.14)" stroke-width="3"/></svg>`;
+  const href = "data:image/svg+xml," + encodeURIComponent(svg);
   faviconCache.set(kind, href);
   return href;
 }
@@ -5075,13 +5048,13 @@ function renderWindowChrome() {
     error: state.error,
     done: doneVisible(),
   });
-  const title = windowTitle(status, state.active?.name);
+  const title = windowTitle(status, state.active?.name, $("breadcrumb")?.textContent);
   if (document.title !== title) document.title = title;
   const link = $("favicon");
   if (link) {
     const href = faviconHref(status.kind);
     if (link.getAttribute("href") !== href) link.setAttribute("href", href);
-    if (link.getAttribute("type") !== "image/png") link.setAttribute("type", "image/png");
+    if (link.getAttribute("type") !== "image/svg+xml") link.setAttribute("type", "image/svg+xml");
   }
 }
 
@@ -5197,7 +5170,8 @@ function applyState(next) {
   else if (wasBusy && !next.error && previous === next.active?.id) {
     const lastAssistant = [...(next.messages || [])].reverse().find((message) => message.role === "assistant");
     if (lastAssistant && lastAssistant.status !== "stopped" && !lastAssistant.error) {
-      playDoneChime();
+      // The chime is a background signal: keep quiet while the chat is being watched.
+      if (document.hidden || !document.hasFocus()) playDoneChime();
       markDone();
     }
   }
