@@ -26,13 +26,18 @@ export function createOnboarding({ document, window, icon, setTimer = setTimeout
       arrow.append(path);
       node.append(arrow, copy);
       document.body.append(node);
-      item = { id, node, copy, target, side, key: "" };
+      item = { id, node, copy, target, side, key: "", scope: "", timer: null, expired: false };
       hints.set(id, item);
     }
     item.target = target;
     item.side = side;
     const key = text + "|" + (symbol || "");
-    if (item.key !== key) {
+    const scope = `${context.page}|${context.chatId || ""}|${Boolean(context.wizard)}`;
+    if (item.key !== key || item.scope !== scope) {
+      clearTimer(item.timer);
+      item.timer = null;
+      item.expired = false;
+      item.scope = scope;
       item.key = key;
       item.copy.replaceChildren();
       if (symbol) {
@@ -46,14 +51,20 @@ export function createOnboarding({ document, window, icon, setTimer = setTimeout
       label.textContent = text;
       item.copy.append(label);
     }
+    if (item.expired) { hide(id); return; }
     item.node.classList.add("is-visible");
     item.node.setAttribute("aria-hidden", "false");
+    if (item.timer === null) {
+      item.timer = setTimer(() => { item.expired = true; hide(id); }, 3000);
+    }
     positionSoon();
   }
 
   function hide(id) {
     const item = hints.get(id);
     if (!item) return;
+    clearTimer(item.timer);
+    item.timer = null;
     item.node.classList.remove("is-visible");
     item.node.setAttribute("aria-hidden", "true");
   }
@@ -157,10 +168,10 @@ export function createOnboarding({ document, window, icon, setTimer = setTimeout
     const text = $("draft")?.value.trim();
     const phase = context.voicePhase;
     const voiceBusy = ["starting", "recording", "transcribing"].includes(phase) && context.voiceTarget !== "panel";
-    const send = Boolean(active && current.ready && text && !voiceBusy && !$("send").disabled);
+    const send = Boolean(context.wizard && active && current.ready && text && !voiceBusy && !$("send").disabled);
     const wrap = $("composer")?.closest(".composer-wrap") || $("composer");
-    // Reserve chat footer space on entry, never when the send hint appears.
-    wrap?.classList.toggle("has-send-coachmark", !context.wizard && context.page === "chat" && !context.hasMessages);
+    // Hints are overlays and must never reserve space or lift the composer.
+    wrap?.classList.remove("has-send-coachmark");
     if (!active) {
       hide("draft"); hide("voice"); hide("send");
       return;
@@ -189,6 +200,8 @@ export function createOnboarding({ document, window, icon, setTimer = setTimeout
 
   function bindProject(input, submit) {
     if (project) clearTimer(project.timer);
+    const previousHint = hints.get("project");
+    if (previousHint) previousHint.scope = "";
     project = { input, submit, ready: false, loading: false, timer: null };
     input.addEventListener("input", () => {
       if (project?.input !== input) return;

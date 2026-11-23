@@ -11,6 +11,7 @@ const files = git('ls-tree', '-r', '--name-only', revision).toString().trim().sp
   f === 'LICENSE' || f === 'package.json' || f === 'router/LICENSE' ||
   /^web\/fonts\/(?:[\w.-]+\.woff2|OFL-[\w.-]+\.txt)$/.test(f) ||
   /^(?:web|router)\/[\w.-]+\.(?:mjs|js|ts|css|html)$/.test(f) && !f.includes('.test.') ||
+  /^subagents\/agents\/[\w.-]+\.md$/.test(f) ||
   /^[\w.-]+\.(?:mjs|ts|py)$/.test(f) && !/(?:\.test\.|^test_|smoke|preview)/.test(f));
 const target = new URL('./pi-friendly/', import.meta.url);
 const manifest = {repository:'https://github.com/slavamirniy/pi-friendly', revision, version:'', embeddedRouter:true, files:{}};

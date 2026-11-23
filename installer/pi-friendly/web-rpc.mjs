@@ -20,6 +20,9 @@ export function createRpc({cli,cwd,path,model,onEvent=()=>{},spawnProcess=spawn}
   stderrBuffer+=chunk;
   if(stderrBuffer.length>65536){stderr=(stderr+stderrBuffer.slice(-1200)).slice(-1200);stderrBuffer='';return;}
   let i;while((i=stderrBuffer.indexOf('\n'))>=0){const line=stderrBuffer.slice(0,i).replace(/\r$/,'');stderrBuffer=stderrBuffer.slice(i+1);
+   if(line.startsWith('PI_FRIENDLY_SUBAGENTS ')){
+    try{const event=JSON.parse(line.slice('PI_FRIENDLY_SUBAGENTS '.length));if(event.type==='friendly_subagents'&&Array.isArray(event.subagents))onEvent({type:'friendly_subagents',subagents:event.subagents.slice(0,24)});}catch{}continue;
+   }
    if(line.startsWith('PI_FRIENDLY_PROGRESS ')){
     try{const event=JSON.parse(line.slice('PI_FRIENDLY_PROGRESS '.length));if(event.type!=='friendly_router_progress')continue;const p=event.progress;
      if(p===null){onEvent({type:event.type,progress:null});continue;}

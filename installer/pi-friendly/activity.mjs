@@ -5,6 +5,11 @@ export function activityLabel(name,args={}) {
  if(name==='write')return 'Создаю файл'+suffix;
  if(name==='edit')return 'Обновляю файл'+suffix;
  if(name==='read')return 'Читаю файл'+suffix;
+ if(name==='subagent'){
+  const agent=clean(args.agent||'');const count=Array.isArray(args.tasks)?args.tasks.length:Array.isArray(args.chain)?args.chain.length:0;
+  if(count)return 'Запускаю субагентов · '+count;
+  return agent?'Запускаю субагента · '+agent:'Запускаю субагента';
+ }
  if(name==='bash'){
   const command=String(args.command||'');
   if(/\b(test|vitest|pytest|jest)\b/.test(command))return 'Запускаю тесты';

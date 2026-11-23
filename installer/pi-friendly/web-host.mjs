@@ -1,5 +1,15 @@
 import {randomUUID} from 'node:crypto';
 // Reuse the running terminal session, rather than opening its file a second time.
+export function contextMessages(sessionManager){
+ const entries=sessionManager?.buildContextEntries?.()||sessionManager?.getBranch?.()||[];
+ const messages=[];
+ for(const entry of entries){
+  if(entry?.type==='message')messages.push(entry.message);
+  else if(entry?.type==='compaction')messages.push({role:'compactionSummary',summary:entry.summary,tokensBefore:entry.tokensBefore,timestamp:entry.timestamp});
+  else if(entry?.type==='branch_summary')messages.push({role:'branchSummary',summary:entry.summary,timestamp:entry.timestamp});
+ }
+ return messages;
+}
 export function createHostBridge({pi,ctx,observers,onEvent}){
  observers.add(onEvent);const pending=new Map(),restore=[];
  for(const method of ['select','confirm','input','editor','notify','setStatus','setWidget']){
@@ -21,8 +31,10 @@ export function createHostBridge({pi,ctx,observers,onEvent}){
  return {
   async request(type,data={}){
    if(type==='get_state')return {model:ctx.model,isStreaming:!ctx.isIdle()};
-   if(type==='get_messages')return {messages:ctx.sessionManager.getBranch().filter(e=>e.type==='message').map(e=>e.message)};
+   if(type==='get_messages')return {messages:contextMessages(ctx.sessionManager)};
+   if(type==='get_session_stats')return {contextUsage:ctx.getContextUsage?.()};
    if(type==='prompt'){if(!ctx.isIdle())throw new Error('В консоли уже идёт ответ.');pi.sendUserMessage(data.message,{expandPromptTemplates:true});return;}
+   if(type==='compact')return await new Promise((resolve,reject)=>ctx.compact({customInstructions:data.customInstructions,onComplete:resolve,onError:reject}));
    if(type==='abort'){await ctx.abort();return;}
    if(type==='set_model'){const model=ctx.modelRegistry.getAvailable().find(m=>m.id===data.modelId&&m.provider===data.provider);if(!model||!await pi.setModel(model))throw new Error('Модель недоступна.');return;}
   },

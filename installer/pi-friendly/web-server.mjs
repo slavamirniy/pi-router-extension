@@ -12,7 +12,7 @@ const key=value=>createHash('sha256').update(value).digest('hex').slice(0,24);
 const isDir=async p=>{try{return (await stat(p)).isDirectory();}catch{return false;}};
 const exists=async p=>{try{await stat(p);return true;}catch{return false;}};
 const dirnameOf=p=>{const parent=resolve(p,'..');return parent===p||!p?resolve(p):parent;};
-import {publicMessage,publicMessages,mergeMessage,reconcileMessages,toolView,updateTool} from './web-messages.mjs';
+import {publicMessage,publicMessages,mergeMessage,reconcileMessages,replaceMessages,toolView,updateTool} from './web-messages.mjs';
 import {finalChatTitle,fallbackChatTitle,isValidChatTitle} from './title.mjs';
 import {stripAttachments} from './web/attachments.js';
 export {publicMessage,publicMessages} from './web-messages.mjs';
@@ -58,8 +58,11 @@ export async function startWebServer({billing,projects,listSessions,readSession,
  }
  let confirmBrowser;
  const browserReady=new Promise(resolve=>{confirmBrowser=resolve;});
- let rpc,active,loading=false,navigating=false,disposed=false,allProjects=[],allSessions=[],generation=0,publishTimer,voiceOwned=false,dropRoot;
- let state={active:null,messages:[],busy:false,loading:false,ready:false,error:null,notice:'',statuses:{},widgets:{},questions:[],queue:{steering:[],followUp:[]},voice:voice?.state||null,dictation:null};
+ let rpc,active,loading=false,navigating=false,disposed=false,allProjects=[],allSessions=[],generation=0,publishTimer,noticeTimer,voiceOwned=false,dropRoot,contextReplaced=false;
+ const tokensText=value=>Number.isFinite(value)&&value>=0?Math.round(value).toLocaleString('ru-RU')+' токенов':'';
+ const compactionNotice=result=>{if(!result)return 'История разговора сжата.';const before=tokensText(result.tokensBefore),after=tokensText(result.estimatedTokensAfter);if(before&&after)return `История разговора сжата: ${before} → ≈${after}.`;return before?`История разговора сжата: было ${before}.`:'История разговора сжата.';};
+ const flashNotice=(text,timeout=10000)=>{state.notice=text;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>{noticeTimer=undefined;if(state.notice===text){state.notice='';changed();}},timeout);noticeTimer.unref?.();};
+ let state={active:null,messages:[],busy:false,loading:false,ready:false,error:null,notice:'',statuses:{},widgets:{},questions:[],queue:{steering:[],followUp:[]},voice:voice?.state||null,dictation:null,subagents:[],compacting:null,contextUsage:null};
  const messageVersions=new Map();
  const currentVersionIndex=new Map();
  const titleRequests=new Set();
@@ -196,8 +199,34 @@ export async function startWebServer({billing,projects,listSessions,readSession,
  function eventHandler(event,epoch){
   if(epoch!==generation||disposed)return;
   if(event.type==='agent_start'){state.busy=true;state.error=null;state.routerProgress=null;}
+  if(event.type==='compaction_start'){
+   state.compacting={reason:event.reason||'threshold',startedAt:Date.now()};
+   state.notice=event.reason==='overflow'?'Контекст переполнился — сжимаю историю разговора…':event.reason==='manual'?'Сжимаю историю разговора…':'Контекст заполнен — сжимаю историю разговора…';
+  }
+  if(event.type==='compaction_end'){
+   state.compacting=null;
+   if(event.errorMessage){flashNotice(event.aborted?'Сжатие истории отменено.':'Не удалось сжать историю разговора: '+clean(event.errorMessage).slice(0,200),12000);}
+   else if(event.aborted)flashNotice('Сжатие истории отменено.',8000);
+   else{
+    flashNotice(compactionNotice(event.result),10000);
+    // Overflow compaction retries the prompt; the old error is no longer relevant.
+    if(event.reason==='overflow'){state.error=null;state.pendingError=null;}
+   }
+   // Compaction replaces the whole context: earlier messages really are gone. Do not fetch
+   // while the agent may already be streaming the next answer; the refresh happens at
+   // agent_end, where reconcileMessages would otherwise resurrect the old history.
+   if(state.busy)contextReplaced=true;
+   else void reloadContextMessages();
+   void refreshContextUsage();
+  }
   if(event.type==='friendly_router_progress'){state.routerProgress=event.progress||null;}
-  if(event.type==='agent_end'){rpc?.request('get_messages').then(data=>{if(epoch===generation){state.messages=reconcileMessages(state.messages,publicMessages(data?.messages||[]));changed();}}).catch(()=>{});}
+  if(event.type==='friendly_subagents'&&Array.isArray(event.subagents))state.subagents=event.subagents.slice(0,24);
+  if(event.type==='process_error')state.subagents=(state.subagents||[]).map(item=>item.status==='running'?{...item,status:'stopped',current:'',finishedAt:Date.now()}:item);
+  if(event.type==='agent_end'){
+   const replace=contextReplaced;contextReplaced=false;
+   rpc?.request('get_messages').then(data=>{if(epoch===generation){const next=publicMessages(data?.messages||[]);state.messages=replace?replaceMessages(state.messages,next):reconcileMessages(state.messages,next);changed();}}).catch(()=>{});
+   void refreshContextUsage();
+  }
   if(event.type==='queue_update')state.queue={steering:Array.isArray(event.steering)?event.steering:[],followUp:Array.isArray(event.followUp)?event.followUp:[]};
   if(event.type==='message_start'&&['user','assistant'].includes(event.message?.role))state.messages.push({...publicMessage(event.message),status:event.message.role==='assistant'?'streaming':'done'});
   if(event.type==='message_update'){
@@ -219,7 +248,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
   if(event.type==='auto_retry_end'){state.notice='';if(!event.success){state.busy=false;state.error=event.finalError||'Не удалось восстановить подключение.';}}
   if(event.type==='agent_settled'){state.busy=false;const last=state.messages.findLast(m=>m.role==='assistant');state.error=last?.error||null;state.pendingError=null;state.notice='';}
   if(event.type==='agent_end')for(const m of state.messages)if(m.status==='streaming')m.status='done';
-  if(event.type==='process_error'){state.busy=false;state.error=event.message;for(const m of state.messages){if(m.status==='streaming')m.status='stopped';for(const t of m.tools)if(t.status==='running')t.status='stopped';}}
+  if(event.type==='process_error'){state.busy=false;state.compacting=null;state.error=event.message;for(const m of state.messages){if(m.status==='streaming')m.status='stopped';for(const t of m.tools)if(t.status==='running')t.status='stopped';}}
   if(event.type==='extension_ui_request'){
    if(['select','confirm','input','editor'].includes(event.method)){state.questions.push({...event,expires:event.timeout?Date.now()+event.timeout:null});}
    if(event.method==='notify'){if(event.notifyType==='error'){if(state.busy)state.pendingError=clean(event.message);else state.error=clean(event.message);}else if(!state.busy)state.notice=clean(event.message);}
@@ -229,8 +258,25 @@ export async function startWebServer({billing,projects,listSessions,readSession,
   }
   changed();
  }
+ async function refreshContextUsage(){
+  if(!rpc)return;
+  try{
+   const stats=await rpc.request('get_session_stats',{},15000),usage=stats?.contextUsage,percent=usage?.percent;
+   state.contextUsage=typeof percent==='number'&&Number.isFinite(percent)?{tokens:typeof usage.tokens==='number'&&Number.isFinite(usage.tokens)?usage.tokens:null,contextWindow:typeof usage.contextWindow==='number'&&Number.isFinite(usage.contextWindow)?usage.contextWindow:null,percent}:null;
+   changed();
+  }catch{}
+ }
+ async function reloadContextMessages(){
+  if(!rpc)return;
+  try{
+   const data=await rpc.request('get_messages',{},20000);
+   state.messages=replaceMessages(state.messages,publicMessages(data?.messages||[]));
+   changed();
+  }catch{}
+ }
  async function openSession(session,{notify=true,waitForReady=false}={}){
   loading=true;state.error=null;if(notify)changed();const epoch=++generation;
+  contextReplaced=false;
   let settle;
   const ready=new Promise(resolve=>{settle=resolve;});
   try{
@@ -238,7 +284,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
    const p=allProjects.find(p=>folderKey(p.cwd)===folderKey(session.cwd));if(!p||!projects.isProject(p.cwd))throw new Error('Выберите существующий проект.');
    projects.markOpened?.(p.cwd);
    active={id:key(session.path),sessionId:session.id,projectId:key(folderKey(p.cwd)),projectName:p.name,name:session.name||(session.firstMessage&&session.firstMessage!=='(no messages)'?session.firstMessage.slice(0,80):'Новый чат'),host:session.path===hostSession(),readOnly:session.path===hostSession()&&!makeHostRpc,named:Boolean(session.name),ready:false};
-   state={...state,routerProgress:null,messages:publicMessages(readSession(session.path)),busy:false,error:null,notice:'',questions:[],queue:{steering:[],followUp:[]},statuses:{},widgets:{},ready:false};
+   state={...state,routerProgress:null,messages:publicMessages(readSession(session.path)),busy:false,error:null,notice:'',questions:[],queue:{steering:[],followUp:[]},statuses:{},widgets:{},ready:false,subagents:[],compacting:null,contextUsage:null};
    loading=false;
    if(active.readOnly){
     active={...active,ready:true};state={...state,ready:true};
@@ -265,6 +311,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
      state={...state,messages:reconcileMessages(state.messages,publicMessages(messages?.messages||[])),ready:true,loading:false};
      active={...active,ready:true};
      if(notify){changed();broadcast();}
+     void refreshContextUsage();
      settle(true);
     }catch(error){
      if(epoch===generation){
@@ -320,7 +367,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
   const previousFile=active.file;
   active={...active,id:key(current.sessionFile),name:label,file:current.sessionFile,parent:previousFile?key(previousFile):null,host:false,readOnly:false,named:true};
   const messages=await rpc.request('get_messages',{},20000);
-  state={...state,messages:publicMessages(messages?.messages||[]),busy:false,error:null,notice:'',questions:[],queue:{steering:[],followUp:[]},statuses:{},widgets:{}};
+  state={...state,messages:publicMessages(messages?.messages||[]),busy:false,error:null,notice:'',questions:[],queue:{steering:[],followUp:[]},statuses:{},widgets:{},subagents:[]};
   await catalog();
   if(text){
    state.busy=true;changed();
@@ -556,7 +603,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
      if(isActive){
       if(rpc)await rpc.dispose();
       rpc=undefined;generation++;active=null;
-      state={...state,active:null,messages:[],busy:false,error:null,notice:'',questions:[],queue:{steering:[],followUp:[]},statuses:{},widgets:{},routerProgress:null};
+      state={...state,active:null,messages:[],busy:false,error:null,notice:'',questions:[],queue:{steering:[],followUp:[]},statuses:{},widgets:{},routerProgress:null,subagents:[]};
      }
      if(action==='delete-chat')await unlink(session.path);
      else{
@@ -663,6 +710,21 @@ export async function startWebServer({billing,projects,listSessions,readSession,
      }
      return;
     }
+    if(action==='compact'){
+     ensureIdle();
+     if(!rpc||!active||active.readOnly)throw new Error(active?.readOnly?'Этот чат открыт только для чтения.':'Сначала откройте чат в проекте.');
+     if(!state.messages.some(m=>m.role==='user'))throw new Error('История пока пуста — сжимать нечего.');
+     state.compacting={reason:'manual',startedAt:Date.now()};state.notice='Сжимаю историю разговора…';state.error=null;changed();
+     try{
+      const result=await rpc.request('compact',{},300000);
+      const messages=await rpc.request('get_messages',{},20000);
+      state.messages=replaceMessages(state.messages,publicMessages(messages?.messages||[]));
+      state.compacting=null;flashNotice(compactionNotice(result),10000);changed();
+      void refreshContextUsage();
+      reply(200,{ok:true,notice:state.notice,result:result||null});
+     }catch(error){state.compacting=null;state.notice='';changed();throw error;}
+     return;
+    }
     if(action==='abort'){
      let cleared={steering:[],followUp:[]};
      try{cleared=await rpc.request('clear_queue',{},15000)||cleared;}catch{}
@@ -698,7 +760,7 @@ export async function startWebServer({billing,projects,listSessions,readSession,
   }catch(error){if(!res.headersSent)reply(400,{error:error.message});else res.end();}
  });
  const heartbeat=setInterval(()=>{for(const res of clients)res.write(': heartbeat\n\n');state.questions=state.questions.filter(q=>!q.expires||q.expires>Date.now());},15000);heartbeat.unref();
- async function close(){if(disposed)return;disposed=true;for(const tab of tabs.values())clearTimeout(tab.timer);tabs.clear();generation++;unsub?.();unsubBilling?.();if(voiceOwned)voice?.cancel();clearInterval(heartbeat);clearTimeout(publishTimer);for(const client of clients)client.end();clients.clear();server.close();server.closeIdleConnections?.();await rpc?.dispose();}
+ async function close(){if(disposed)return;disposed=true;for(const tab of tabs.values())clearTimeout(tab.timer);tabs.clear();generation++;unsub?.();unsubBilling?.();if(voiceOwned)voice?.cancel();clearInterval(heartbeat);clearTimeout(publishTimer);clearTimeout(noticeTimer);for(const client of clients)client.end();clients.clear();server.close();server.closeIdleConnections?.();await rpc?.dispose();}
  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});origin=`http://127.0.0.1:${server.address().port}`;
  return {url:origin+'/#'+token,origin,browserReady,async close(){confirmBrowser(false);await close();},get closed(){return disposed;}};
 }

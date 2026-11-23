@@ -36,6 +36,7 @@ const paths = {
   mic: "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0Zm-3 6v1a6 6 0 0 0 12 0v-1m-6 7v4m-3 0h6",
   stop: "M7 7h10v10H7z",
   refresh: "M20 7v-4l-4 1 M20 7a8 8 0 1 0 1 9",
+  compress: "M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5",
   trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   file: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Zm0 0v6h6",
   home: "M3 11 12 3l9 8M5 10v11h14V10",
@@ -45,6 +46,8 @@ const paths = {
   archive: "M21 8v13H3V8M1 3h22v5H1zM10 12h4",
   back: "M19 12H5m6-6-6 6 6 6",
   image: "M3 5h18v14H3zM8.5 10a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M21 15l-5-5L5 19",
+  agents:
+    "M12 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6M6 21v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1M5.5 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M18.5 7.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5",
   warning: "M12 3 2 21h20L12 3Zm0 6v5m0 4h.01",
 };
 
@@ -128,6 +131,11 @@ const GALLERY_BATCH = 12;
 let draggingImageCard = null;
 let imageJobs = [];
 let imageProgressTimer = null;
+let subagentsSignature = "";
+let subagentsTimer = null;
+let subagentsCollapsed = true;
+let subagentViewId = null;
+let subagentViewSignature = "";
 let voiceTarget = "chat";
 let onboardingModel = null;
 let onboardingBusy = false;
@@ -940,6 +948,11 @@ function wireChrome() {
   };
   $("image-open").onclick = () => openImagePanel();
   $("image-gallery-open").onclick = () => openImagePanel();
+  $("subagents-toggle").onclick = () => {
+    subagentsCollapsed = !subagentsCollapsed;
+    subagentsSignature = "";
+    renderSubagents();
+  };
   $("image-compose-back").onclick = () => closeImageCompose();
   $("image-compose-gallery").onclick = () => {
     closeImageCompose();
@@ -1209,6 +1222,9 @@ function wireChrome() {
   $("attach").onclick = () => {
     if (!$("attach").disabled) pickAttachments();
   };
+  $("compact").onclick = () => {
+    if (!$("compact").disabled) compactConversation();
+  };
   const toggleVoice = (target) => {
     voiceTarget = target;
     if (target === "chat" && state.voice?.phase === "recording") onboarding.dictated();
@@ -1376,6 +1392,10 @@ function openProject(project) {
 }
 
 function openBranch(chat) {
+  if (page === "subagent") {
+    showHint("Сначала вернитесь в чат кнопкой «Назад».", true);
+    return;
+  }
   if (state.busy) {
     showHint("Остановите ответ, чтобы переключить чат.", true);
     return;
@@ -1453,6 +1473,10 @@ function openBranch(chat) {
 }
 
 function newBranch() {
+  if (page === "subagent") {
+    showHint("Сначала вернитесь в чат кнопкой «Назад».", true);
+    return;
+  }
   const target = activeProjectId();
   if (!target) {
     showHint("Сначала выберите проект.");
@@ -1853,6 +1877,10 @@ function renderRoute() {
     const project = projectOf(state.active.projectId || projectId);
     setBreadcrumb(state.active.name || "Чат");
     renderChat();
+    return;
+  }
+  if (page === "subagent") {
+    renderSubagentPage();
     return;
   }
   if (page === "create") {
@@ -2344,7 +2372,7 @@ function renderMessages() {
   if (signature === renderedSignature) return;
   renderedSignature = signature;
   const area = $("messages");
-  const nearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 120;
+  const nearBottom = area.scrollHeight - area.scrollTop - area.clientHeight < 48;
   const oldTop = area.scrollTop;
   const frag = document.createDocumentFragment();
   const messages = state.messages || [];
@@ -2401,6 +2429,12 @@ function renderMessages() {
       message.status !== "streaming"
     )
       return;
+    if (message.role === "summary") {
+      finishAssistant();
+      previousAssistant = false;
+      frag.append(summaryCard(message, (state.active?.id || "") + ":" + index));
+      return;
+    }
     const user = message.role === "user";
     if (user) {
       finishAssistant();
@@ -2573,7 +2607,7 @@ function renderMessages() {
     area.replaceChildren(frag);
   }
   syncGenerationClock();
-  if (nearBottom && !area.querySelector("details[open]")) area.scrollTop = area.scrollHeight;
+  if (nearBottom) area.scrollTop = area.scrollHeight;
   else area.scrollTop = oldTop;
   if (editingIndex != null) {
     const textarea = area.querySelector(".edit-box textarea");
@@ -2582,6 +2616,28 @@ function renderMessages() {
       textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
   }
+}
+
+function summaryCard(message, key) {
+  const card = el("article", null, "chat-summary");
+  const head = el("div", null, "chat-summary-head");
+  head.append(icon("compress"));
+  head.append(
+    el(
+      "span",
+      message.kind === "branch" ? "Ветка разговора сжата" : "История разговора сжата",
+      "chat-summary-title",
+    ),
+  );
+  if (Number.isFinite(message.tokensBefore) && message.tokensBefore > 0)
+    head.append(el("span", `${message.tokensBefore.toLocaleString("ru-RU")} токенов до сжатия`, "pill-badge"));
+  card.append(head);
+  if (message.text) {
+    const body = el("div", null, "chat-summary-body");
+    markdown(body, message.text);
+    card.append(disclosure("Краткий пересказ", body, "chat-summary-details", null, key + ":summary"));
+  }
+  return card;
 }
 
 function disclosure(label, body, cls = "", badge = null, key = null) {
@@ -3959,6 +4015,18 @@ function abortGeneration() {
   });
 }
 
+function compactConversation() {
+  if (!state.active || state.busy || state.compacting) return;
+  if (!state.messages?.some((message) => message.role === "user")) {
+    showHint("История пока пуста — сжимать нечего.", true);
+    return;
+  }
+  run("Сжимаю историю разговора…", async () => {
+    const result = await api("compact", { chat: state.active.id }, 300000);
+    if (result?.notice) showHint(result.notice);
+  });
+}
+
 function forkMessage(index, text) {
   if (!state.active) return;
   if (!canSwitch()) return;
@@ -4014,6 +4082,19 @@ function renderStatus() {
   $("draft").disabled = Boolean(readOnly || !connected);
   $("attach").hidden = !(page === "chat" && state.active && !readOnly);
   $("attach").disabled = !connected || readOnly;
+  const compact = $("compact");
+  if (compact) {
+    const hasHistory = Boolean(state.messages?.some((message) => message.role === "user"));
+    const compacting = Boolean(state.compacting);
+    compact.hidden = !(page === "chat" && state.active && !readOnly);
+    compact.disabled = !connected || readOnly || busy || navigating || recording || !ready || !hasHistory || compacting;
+    compact.title = compacting
+      ? "Сжимаю историю разговора…"
+      : busy
+        ? "Сжать историю можно после завершения ответа"
+        : "Сжать историю разговора: старые сообщения заменятся кратким пересказом";
+    compact.setAttribute("aria-busy", String(compacting));
+  }
   $("mic").disabled = !connected || !state.active || readOnly || voice?.phase === "transcribing";
   $("mic").hidden = !voiceIsAvailable(voice?.phase);
   $("mic").replaceChildren(icon(voice?.phase === "recording" ? "stop" : "mic"));
@@ -4048,6 +4129,7 @@ function renderStatus() {
   renderQuestions();
   renderVoice(voice, recording);
   renderQuota();
+  renderContextUsage();
   showError(state.error && !state.messages?.some((message) => message.error === state.error) ? state.error : "");
   $("notice").textContent = state.notice || "";
   $("notice").hidden = !state.notice;
@@ -4102,6 +4184,28 @@ function renderVoice(voice, recording) {
       setup.append(progress);
     }
   }
+}
+
+function renderContextUsage() {
+  const node = $("context-usage");
+  if (!node) return;
+  const usage = state.contextUsage;
+  const percent = usage?.percent;
+  const tokens = usage?.tokens;
+  const windowSize = usage?.contextWindow;
+  if (typeof percent !== "number" || !Number.isFinite(percent) || percent < 0) {
+    node.hidden = true;
+    node.textContent = "";
+    node.classList.remove("high");
+    return;
+  }
+  node.hidden = false;
+  node.textContent = `Контекст ${Math.min(100, Math.round(percent))}%`;
+  node.title =
+    typeof tokens === "number" && typeof windowSize === "number" && Number.isFinite(tokens) && Number.isFinite(windowSize)
+      ? `${tokens.toLocaleString("ru-RU")} из ${windowSize.toLocaleString("ru-RU")} токенов`
+      : "Заполнение контекстного окна модели";
+  node.classList.toggle("high", percent >= 80);
 }
 
 function renderQuota() {
@@ -4459,6 +4563,312 @@ function uploadFiles() {
   })();
 }
 
+/* ============================== subagents ============================== */
+
+function subagentList() {
+  return Array.isArray(state.subagents) ? state.subagents : [];
+}
+
+function subagentStatus(entry) {
+  if (entry.status === "running") return { label: "работает", cls: "warn" };
+  if (entry.status === "done") return { label: "готово", cls: "ok" };
+  if (entry.status === "stopped") return { label: "остановлен", cls: "" };
+  return { label: "ошибка", cls: "err" };
+}
+
+function subagentStarted(entry) {
+  return entry.startedAt || entry.finishedAt || Date.now();
+}
+
+function subagentElapsed(entry) {
+  const start = subagentStarted(entry);
+  const end = entry.status === "running" ? Date.now() : entry.finishedAt || Date.now();
+  const seconds = Math.max(0, Math.round((end - start) / 1000));
+  if (seconds < 60) return `${seconds} с`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} мин ${seconds % 60} с`;
+  return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
+}
+
+function subagentTokens(value) {
+  const number = Number(value) || 0;
+  if (number < 1000) return String(number);
+  if (number < 10000) return `${(number / 1000).toFixed(1)}k`;
+  if (number < 1000000) return `${Math.round(number / 1000)}k`;
+  return `${(number / 1000000).toFixed(1)}M`;
+}
+
+function subagentUsage(entry) {
+  const usage = entry.usage || {};
+  const parts = [];
+  if (usage.turns) parts.push(`${usage.turns} ${plural(usage.turns, "шаг", "шага", "шагов")}`);
+  if (usage.input) parts.push(`↑${subagentTokens(usage.input)}`);
+  if (usage.output) parts.push(`↓${subagentTokens(usage.output)}`);
+  if (usage.cost) parts.push(`$${Number(usage.cost).toFixed(4)}`);
+  if (usage.contextTokens) parts.push(`ctx:${subagentTokens(usage.contextTokens)}`);
+  if (entry.model) parts.push(entry.model);
+  return parts.join(" · ");
+}
+
+function subagentsSummary(entries) {
+  if (!entries.length) return "";
+  const running = entries.filter((entry) => entry.status === "running").length;
+  if (running) return `${running} из ${entries.length} работает`;
+  const failed = entries.filter((entry) => entry.status === "error").length;
+  return [
+    `${entries.length} ${plural(entries.length, "агент", "агента", "агентов")}`,
+    failed ? `${failed} с ошибкой` : "все завершены",
+  ].join(" · ");
+}
+
+function subagentNote(entry) {
+  if (entry.status === "running") return entry.current || "Работает…";
+  if (entry.status === "stopped") return "Остановлен";
+  if (entry.status === "error") return entry.error || "Не удалось выполнить задачу";
+  const line = String(entry.output || "")
+    .split("\n")
+    .map((value) => value.trim())
+    .find(Boolean);
+  return line ? line.replace(/^#+\s*/, "") : "Готово";
+}
+
+function subagentCard(entry) {
+  const card = el("button", null, "subagent-card " + (entry.status || "running"));
+  card.type = "button";
+  card.title = entry.task || entry.agent;
+  const head = el("span", null, "subagent-head");
+  const name = el("span", entry.agent, "subagent-name");
+  if (entry.step) name.textContent = `${entry.agent} · шаг ${entry.step}`;
+  const clock = el("span", subagentElapsed(entry), "subagent-time");
+  clock.dataset.subagentClock = entry.id;
+  head.append(el("span", null, "subagent-dot"), name, clock);
+  card.append(head, el("span", subagentNote(entry), "subagent-note"));
+  card.onclick = () => openSubagent(entry.id);
+  return card;
+}
+
+function stopSubagentsTimer() {
+  clearInterval(subagentsTimer);
+  subagentsTimer = null;
+}
+
+function updateSubagentsSection(entries) {
+  const panel = $("subagents-panel");
+  if (!panel) return;
+  panel.hidden = !entries.length || !state.active;
+  panel.classList.toggle("collapsed", subagentsCollapsed);
+  const count = $("subagents-count");
+  if (count) {
+    count.textContent = String(entries.length);
+    count.title = `${entries.length} ${plural(entries.length, "агент", "агента", "агентов")} работает`;
+  }
+  const summary = $("subagents-summary");
+  if (summary) summary.textContent = subagentsSummary(entries);
+  const toggle = $("subagents-toggle");
+  if (toggle) toggle.setAttribute("aria-expanded", subagentsCollapsed ? "false" : "true");
+}
+
+function renderSubagents() {
+  const panel = $("subagents-panel");
+  if (!panel) return;
+  const entries = subagentList().filter((entry) => entry.status === "running");
+  updateSubagentsSection(entries);
+  if (panel.hidden || subagentsCollapsed) {
+    stopSubagentsTimer();
+    return;
+  }
+  const area = $("subagents-list");
+  const signature = JSON.stringify(
+    entries.map((entry) => [entry.id, entry.status, entry.current, entry.task, entry.finishedAt]),
+  );
+  if (signature !== subagentsSignature) {
+    subagentsSignature = signature;
+    const scroll = area.scrollTop;
+    area.replaceChildren(...entries.map(subagentCard));
+    area.scrollTop = scroll;
+  } else {
+    for (const entry of entries) {
+      const clock = area.querySelector(`[data-subagent-clock="${entry.id}"]`);
+      if (clock) clock.textContent = subagentElapsed(entry);
+    }
+  }
+  stopSubagentsTimer();
+  if (entries.length) {
+    subagentsTimer = setInterval(() => {
+      if (subagentsCollapsed) return;
+      for (const entry of subagentList()) {
+        const clock = $("subagents-list")?.querySelector(`[data-subagent-clock="${entry.id}"]`);
+        if (clock) clock.textContent = subagentElapsed(entry);
+      }
+    }, 1000);
+  }
+}
+
+function subagentViewEntry() {
+  return subagentList().find((entry) => entry.id === subagentViewId);
+}
+
+function openSubagent(id) {
+  if (!id) return;
+  subagentViewId = id;
+  subagentViewSignature = "";
+  page = "subagent";
+  renderRoute();
+  $("page").scrollTop = 0;
+}
+
+function leaveSubagent() {
+  subagentViewId = null;
+  subagentViewSignature = "";
+  page = state.active ? "chat" : "chats";
+  renderRoute();
+}
+
+function subagentBackButton() {
+  const button = el("button", null, "subagent-back");
+  button.type = "button";
+  button.append(icon("back"), el("span", "Назад в чат"));
+  button.onclick = leaveSubagent;
+  return button;
+}
+
+function subagentStatusLine(entry) {
+  const status = subagentStatus(entry);
+  const line = el("div", null, "subagent-status-line " + (entry.status || "running"));
+  line.append(el("span", null, "subagent-dot"), el("span", status.label, "subagent-status-word"));
+  const clock = el("span", subagentElapsed(entry), "subagent-status-clock");
+  clock.dataset.subagentViewClock = "1";
+  line.append(clock);
+  return line;
+}
+
+function subagentShort(value, limit = 180) {
+  const text = String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length <= limit) return text;
+  return text.slice(0, limit - 1).trimEnd() + "…";
+}
+
+function subagentThinkingNode(entry) {
+  const thinking = (Array.isArray(entry.items) ? entry.items : [])
+    .filter((item) => item.type === "thinking" && item.text)
+    .map((item) => item.text)
+    .join("\n\n")
+    .trim();
+  if (!thinking) return null;
+  const body = el("div", null, "reasoning-text");
+  markdown(body, thinking);
+  return disclosure(
+    entry.status === "running" ? "Размышляет…" : "Размышления",
+    body,
+    "reasoning",
+    entry.status === "running" ? { label: "идёт", cls: "warn" } : null,
+    `${entry.id}:thinking`,
+  );
+}
+
+function subagentWorkNode(entry) {
+  const items = (Array.isArray(entry.items) ? entry.items : []).filter((item) => item.type !== "thinking");
+  if (!items.length) return null;
+  const box = el("div", null, "subagent-work");
+  box.append(el("div", "Ход работы", "subagent-work-title"));
+  for (const item of items) {
+    const tool = item.type === "tool";
+    const row = el("div", null, "subagent-work-row " + (tool ? item.status || "done" : "text"));
+    const text = subagentShort(item.text, tool ? 140 : 200);
+    const line = el("span", text, "subagent-work-text");
+    line.title = String(item.text || "");
+    row.append(el("span", null, "tool-dot"), line);
+    box.append(row);
+  }
+  return box;
+}
+
+function subagentAnswer(entry) {
+  const answer = el("div", null, "answer subagent-answer");
+  if (entry.status === "running") {
+    answer.textContent = subagentShort(entry.current || "Работает…", 200);
+    answer.append(el("span", null, "typing-caret"));
+    return answer;
+  }
+  if (entry.status === "error") {
+    answer.classList.add("error");
+    answer.textContent = entry.error || "Не удалось выполнить задачу.";
+    return answer;
+  }
+  if (entry.status === "stopped") {
+    answer.textContent = "Остановлен пользователем.";
+    return answer;
+  }
+  answer.textContent = "Готово. Результат — в основном чате.";
+  return answer;
+}
+
+function renderSubagentPage() {
+  const entry = subagentViewEntry();
+  if (!entry) {
+    subagentViewId = null;
+    subagentViewSignature = "";
+    page = state.active ? "chat" : "chats";
+    renderRoute();
+    return;
+  }
+  setBreadcrumb(`Субагент · ${entry.agent}`);
+  const signature = JSON.stringify([
+    entry.id,
+    entry.status,
+    entry.current,
+    entry.output,
+    entry.error,
+    (entry.items || []).length,
+    (entry.items || []).at(-1)?.status,
+  ]);
+  const pageNode = $("page");
+  if (signature === subagentViewSignature && pageNode.firstChild) {
+    const clock = pageNode.querySelector("[data-subagent-view-clock]");
+    if (clock) clock.textContent = subagentElapsed(entry);
+    return;
+  }
+  const nearBottom = pageNode.scrollHeight - pageNode.scrollTop - pageNode.clientHeight < 120;
+  const scroll = pageNode.scrollTop;
+  subagentViewSignature = signature;
+
+  const root = el("div", null, "page-inner subagent-view");
+  root.append(subagentBackButton());
+
+  const chat = el("div", null, "subagent-chat");
+  const user = el("div", null, "message user");
+  const wrapper = el("div", null, "user-message-wrapper");
+  const bubble = el("div", null, "user-bubble");
+  bubble.append(el("p", entry.task || ""));
+  wrapper.append(bubble);
+  user.append(wrapper);
+  chat.append(user);
+
+  const assistant = el("div", null, "message assistant");
+  const mark = el("div", null, "assistant-mark");
+  mark.textContent = "π";
+  const body = el("div", null, "assistant-body");
+  body.append(subagentStatusLine(entry));
+  const thinking = subagentThinkingNode(entry);
+  if (thinking) body.append(thinking);
+  body.append(subagentAnswer(entry));
+  const work = subagentWorkNode(entry);
+  if (work) body.append(work);
+  const meta = el("div", null, "subagent-view-meta");
+  const usage = subagentUsage(entry);
+  if (usage) meta.append(el("span", usage));
+  if (meta.childNodes.length) body.append(meta);
+  assistant.append(mark, body);
+  chat.append(assistant);
+  root.append(chat);
+
+  pageNode.replaceChildren(root);
+  if (entry.status === "running" && (nearBottom || scroll === 0)) pageNode.scrollTop = pageNode.scrollHeight;
+  else pageNode.scrollTop = scroll;
+}
+
 /* ============================== apply server state ============================== */
 
 function applyState(next) {
@@ -4482,6 +4892,7 @@ function applyState(next) {
   const previous = state.active?.id;
   const previousName = state.active?.id && state.active.id === next.active?.id ? state.active.name : null;
   state = next;
+  if (typeof renderSubagents === "function") renderSubagents();
   if (previousName && state.active?.name && previousName !== state.active.name) {
     const project = projectOf(state.active.projectId);
     const chat = project?.chats.find((item) => item.id === state.active.id);
@@ -4499,6 +4910,12 @@ function applyState(next) {
     versionManager.reset();
     renderedSignature = "";
     queueSignature = "";
+    if (typeof subagentsSignature !== "undefined") subagentsSignature = "";
+    if (page === "subagent") {
+      page = "chat";
+      subagentViewId = null;
+      subagentViewSignature = "";
+    }
     attachments = [];
     renderAttachments();
     autoGrow();
@@ -4554,15 +4971,20 @@ function applyState(next) {
     updateOnboarding();
     return;
   }
-  if (state.active && !lastChat) {
+  if (state.active && !lastChat && page !== "subagent") {
     lastChat = state.active.id;
     page = "chat";
     renderRoute();
     return;
   }
-  if (!state.active && page === "chat") {
+  if (!state.active && (page === "chat" || page === "subagent")) {
     page = "chats";
+    subagentViewId = null;
     renderRoute();
+    return;
+  }
+  if (page === "subagent") {
+    renderSubagentPage();
     return;
   }
   if (page === "chat") {

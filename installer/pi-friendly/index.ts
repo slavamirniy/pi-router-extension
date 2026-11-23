@@ -19,6 +19,9 @@ import { homedir } from "node:os";
 import { createProjectStore } from "./projects.mjs";
 import { join } from "node:path";
 import { installFriendly } from "./friendly.mjs";
+import { installSubagents } from './subagents.mjs';
+import { DEFAULT_IMAGE_HISTORY_LIMIT, imageHistoryLimit, pruneOldImages } from './image-history.mjs';
+import { DEFAULT_TEXT_HEAD_CHARS, DEFAULT_TEXT_HISTORY_LIMIT, pruneOldToolTexts, textHeadChars, textHistoryLimit } from './text-history.mjs';
 export default function friendly(pi: ExtensionAPI) {
   let billingContext:any;
   const getConnection=async()=>{
@@ -42,7 +45,19 @@ export default function friendly(pi: ExtensionAPI) {
     }
   });
   let billingTimer:any;
-  pi.on('session_start',async(_event,ctx)=>{billingContext=ctx;if(ctx.mode!=='tui')return;void billing.refresh();clearInterval(billingTimer);billingTimer=setInterval(()=>void billing.refresh(),30000);billingTimer.unref?.();});
+  let imageLimit=DEFAULT_IMAGE_HISTORY_LIMIT,textLimit=DEFAULT_TEXT_HISTORY_LIMIT,textHead=DEFAULT_TEXT_HEAD_CHARS;
+  function refreshLimits(){
+    let prefs={};try{prefs=JSON.parse(readFileSync(preferencePath,'utf8'));}catch{}
+    imageLimit=imageHistoryLimit(prefs);textLimit=textHistoryLimit(prefs);textHead=textHeadChars(prefs);
+  }
+  // Only the newest images and the newest long tool outputs travel with each request;
+  // old ones stay on disk and in the chat UI, but are shortened in the model context.
+  pi.on('context',(event:any,ctx:any)=>{
+    const images=pruneOldImages(event.messages,imageLimit);
+    const messages=pruneOldToolTexts(images,textLimit,textHead,ctx?.cwd||'');
+    return messages===event.messages?undefined:{messages};
+  });
+  pi.on('session_start',async(_event,ctx)=>{billingContext=ctx;refreshLimits();if(ctx.mode!=='tui')return;void billing.refresh();clearInterval(billingTimer);billingTimer=setInterval(()=>void billing.refresh(),30000);billingTimer.unref?.();});
   pi.on('agent_end',()=>{void billing.refresh();});
   pi.on('session_shutdown',()=>{clearInterval(billingTimer);billing.dispose();});
   const openExternal=(url:string)=>{const c=process.platform==='win32'?spawn('rundll32.exe',['url.dll,FileProtocolHandler',url],{windowsHide:true,stdio:'ignore'}):spawn(process.platform==='darwin'?'open':'xdg-open',[url],{stdio:'ignore'});c.on('error',()=>{});c.unref();};
@@ -66,8 +81,18 @@ export default function friendly(pi: ExtensionAPI) {
   const projects=createProjectStore({root:join(homedir(),"Documents","AI DIY Projects"),registry:join(getAgentDir(),"friendly-projects.jsonl"),SessionManager});
   let web: any, launching: Promise<void> | undefined, sessionGeneration=0, unlockTerminal: (()=>void) | undefined;
   const hostObservers=new Set<(event:any)=>void>();
+  const emitSubagents=(subagents:any[])=>{const event={type:'friendly_subagents',subagents};
+    if(process.env.PI_FRIENDLY_WEB_CHILD==='1')process.stderr.write('PI_FRIENDLY_SUBAGENTS '+JSON.stringify(event)+'\n');
+    else for(const emit of hostObservers)emit(event);};
+  const subagents=!Number(process.env.PI_FRIENDLY_SUBAGENT_DEPTH)&&process.env.PI_FRIENDLY_NO_SUBAGENTS!=='1'
+    ? installSubagents(pi,{Type,cli:join(getPackageDir(),'dist','bundle','cli.js'),userDir:join(getAgentDir(),'agents'),emit:emitSubagents})
+    : undefined;
   routerProgress(pi,{onSnapshot:(progress:any,ctx:any)=>{const event={type:'friendly_router_progress',progress};if(process.env.PI_FRIENDLY_WEB_CHILD==='1'&&ctx?.mode==='rpc')process.stderr.write('PI_FRIENDLY_PROGRESS '+JSON.stringify(event)+'\n');else for(const emit of hostObservers)emit(event);}});
   for(const type of ['agent_start','agent_end','agent_settled','message_start','message_update','message_end','tool_execution_start','tool_execution_update','tool_execution_end'] as const)pi.on(type,(event:any)=>{for(const emit of hostObservers)emit(event);});
+  // The web session opened from the console gets the same compaction events as RPC sessions.
+  pi.on('session_before_compact' as any,(event:any)=>{for(const emit of hostObservers)emit({type:'compaction_start',reason:event?.reason});});
+  pi.on('session_compact' as any,(event:any)=>{const entry=event?.compactionEntry;for(const emit of hostObservers)emit({type:'compaction_end',reason:event?.reason,aborted:false,willRetry:event?.willRetry,result:entry?{summary:entry.summary,tokensBefore:entry.tokensBefore,firstKeptEntryId:entry.firstKeptEntryId}:undefined});});
+  pi.on('session_compact_failed' as any,(event:any)=>{for(const emit of hostObservers)emit({type:'compaction_end',reason:event?.reason,aborted:Boolean(event?.aborted),errorMessage:event?.errorMessage});});
   const launchWeb=async(ctx: any, voice: any, getHostStatuses: any=()=>[])=>{
     const generation=sessionGeneration;
     if(process.env.PI_FRIENDLY_WEB_CHILD==='1')return;
@@ -99,7 +124,7 @@ export default function friendly(pi: ExtensionAPI) {
     const task:Promise<void>=launchWeb(ctx,voice,getHostStatuses).finally(()=>{if(launching===task)launching=undefined;});
     launching=task;return task;
   };
-  pi.on('session_shutdown',async()=>{sessionGeneration++;launching=undefined;const server=web;web=undefined;unlockTerminal?.();unlockTerminal=undefined;await server?.close();});
+  pi.on('session_shutdown',async()=>{sessionGeneration++;launching=undefined;const server=web;web=undefined;unlockTerminal?.();unlockTerminal=undefined;subagents?.dispose();await server?.close();});
   installFriendly(pi, { billing,openExternal,canAutoOpen,openWeb, isWebActive:()=>Boolean(unlockTerminal&&web&&!web.closed), copyToClipboard, readClipboardText, sliceByColumn, matchesKey, truncate: truncateToWidth, measure: visibleWidth,
     makeInput: () => new Input(),
     createVoice: callbacks => createVoiceService({root:join(getAgentDir(),'friendly-voice'),...callbacks}),
