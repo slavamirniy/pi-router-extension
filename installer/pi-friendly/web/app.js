@@ -40,7 +40,7 @@ const paths = {
   "volume-off": "M11 5 6 9H2v6h4l5 4V5Zm5 3 6 6m0-6-6 6",
   stop: "M7 7h10v10H7z",
   refresh: "M20 7v-4l-4 1 M20 7a8 8 0 1 0 1 9",
-  more: "M12 6h.01M12 12h.01M12 18h.01",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
   compress: "M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5",
   trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   file: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Zm0 0v6h6",
@@ -2459,9 +2459,8 @@ function subagentToolBlock(entry, tool) {
 }
 
 function subagentToolCard(tool) {
-  const ids = new Set((tool.subagents || []).map((entry) => entry.id));
-  let entries = (state.subagents || []).filter((entry) => ids.has(entry.id));
-  if (!entries.length) entries = tool.subagents || [];
+  const live = state.subagents || [];
+  const entries = (tool.subagents || []).map((entry) => live.find((item) => item.id === entry.id) || entry);
   const holder = el("div", null, "subagent-tools");
   if (!entries.length) {
     holder.append(
