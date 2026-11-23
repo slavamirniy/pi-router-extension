@@ -37,3 +37,11 @@ export function workPathTitle(count) {
         : "шагов";
   return `Ход работы · ${total} ${word}`;
 }
+
+// A finished turn stays collapsed, except when the reader explicitly opened the
+// work path or had already opened one of its steps (thinking, a tool, versions).
+export function shouldOpenWorkPath({ answer = -1, nestedOpen = false, explicit } = {}) {
+  if (explicit === true || explicit === false) return explicit;
+  if (nestedOpen) return true;
+  return answer < 0;
+}

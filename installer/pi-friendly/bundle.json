@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
-  "revision": "7f2a282a6e1a86cd6d6b9daf95358118ab454b06",
-  "version": "0.17.5",
+  "revision": "c042d236c987206e80242ecdc8c8685c3b9f7628",
+  "version": "0.17.6",
   "embeddedRouter": true,
   "files": {
     "LICENSE": "7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd",
@@ -24,7 +24,7 @@
     "model-picker.mjs": "b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689",
     "model-preference.mjs": "91ab8ecfa8c38ab0dc103fadd60de50993d435ebb77a38408a5eb5a220cfd2af",
     "mouse.mjs": "4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0",
-    "package.json": "6f7283eea046667a8577b66fea2ac016132972c2af4b20f549d10faf79b8ea7c",
+    "package.json": "3d57ccd8fd8b6799b3b863c3e8b719c5ee43348c3a7e0d1afb4c74401b8d3a6d",
     "project-form.mjs": "990d61dab347a589bfe9c6bdd5f066c082b1d02f1b1487f92d4e41df573bc6c0",
     "projects.mjs": "a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03",
     "router/LICENSE": "7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710",
@@ -52,7 +52,7 @@
     "web-server.mjs": "6e471247a86dc98c3407e0aa5645f76493c86dea6464d97860e90a4c0a86f315",
     "web/ai-diy.png": "ce353036890960615073158ff65bb5dc392104371e3110e3c1bb42c40f0c83dd",
     "web/app.css": "114a56a3eab42e5b320ada74d0b5e6da7de26e6fe9606d090c7756a42748d157",
-    "web/app.js": "af371497aa2db5f8ccd53b394b129ec7a9f883b1b1d33467c605e41dac6812a3",
+    "web/app.js": "326d37e5452bc934438f48b6bb750095f07007232e38f26fb0aad5fa25d5d359",
     "web/attachments.js": "49366bf020821f68ff0f96395d1f8c9e12d8d4b0a8075ecdf65561a095ec8d5e",
     "web/billing-ui.js": "908cdbe3cbb94fa2eb6e3ab8c1c5d22c92d176644ebc45f6e7743639fca2cf17",
     "web/chrome.js": "6a3018e92ad07fe310d67c10e3f82bde59ef205b920ef5b44289f0805b4d07f8",
@@ -67,7 +67,7 @@
     "web/onboarding.js": "69954d60f5549bd20062f05f5fbda253d446a4bcc1de3df3cab99a06c222a7da",
     "web/sounds/done.mp3": "cfe22294469460f0cef050cbf533c8f66074cc8e63982d7ec0bbb3d2f7b57ab4",
     "web/work-path.css": "4440113acff6008dcd053a474ad2f013ff69bb2ff25c1b714d7e34dc6e941b11",
-    "web/work-path.js": "d9d4cbb840fbc3abf2746d90f29293998e93447d04e6fb8c39718419b11cd82d",
+    "web/work-path.js": "cb9f4d5ab49b2df68132ce6b9a77ac264bbb25ba58bcbaf23e7d1ee9a0d5f2ea",
     "workspace.mjs": "d08cbc9e280207dcf05ba038cd164823ab292b3213599423984736b9dc3c2941"
   }
 }

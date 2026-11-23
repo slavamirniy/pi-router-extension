@@ -1,6 +1,6 @@
 {
   "name": "pi-friendly",
-  "version": "0.17.5",
+  "version": "0.17.6",
   "type": "module",
   "description": "AI DIY: понятное меню с мышью и компактный интерфейс",
   "license": "MIT",

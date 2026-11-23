@@ -3,7 +3,7 @@ import { createVersionManager } from "./message-versions.js";
 import { splitAttachments, buildOutgoingText } from "./attachments.js";
 import { FAVICON_COLORS, windowStatus, windowTitle } from "./chrome.js";
 import { createOnboarding, voiceIsAvailable } from "./onboarding.js";
-import { partitionAssistantParts, workPathTitle } from "./work-path.js";
+import { partitionAssistantParts, shouldOpenWorkPath, workPathTitle } from "./work-path.js";
 
 const billingUI = createBillingUI();
 const versionManager = createVersionManager();
@@ -2551,15 +2551,14 @@ function renderMessages() {
       if (work.length) {
         const body = el("div", null, "work-path");
         for (const index of work) body.append(parts[index].node);
-        const details = disclosure(
-          workPathTitle(work.length),
-          body,
-          "work-path-card",
-          null,
-          assistantKey + ":work",
-        );
-        // A turn without final text is all work: show it rather than an empty bubble.
-        if (answer < 0) details.open = true;
+        const workKey = assistantKey + ":work";
+        const nestedOpen = work.some((index) => parts[index].node?.open === true);
+        const details = disclosure(workPathTitle(work.length), body, "work-path-card", null, workKey);
+        details.open = shouldOpenWorkPath({
+          answer,
+          nestedOpen,
+          explicit: expandedDetails.has(workKey) ? expandedDetails.get(workKey) : undefined,
+        });
         assistantContent.append(details);
       }
       if (answer >= 0) assistantContent.append(parts[answer].node);
