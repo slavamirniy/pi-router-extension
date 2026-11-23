@@ -1,11 +1,19 @@
 import {activityLabel} from './activity.mjs';
 import {clean} from './menu.mjs';
 const output=result=>(result?.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n').slice(-16000);
-export function toolView(c){return {id:c.id,name:c.name,label:activityLabel(c.name,c.arguments||{}),path:clean(c.arguments?.path||c.arguments?.file_path||''),command:clean(c.arguments?.command||''),status:'pending',images:[]};}
+export function toolView(c){
+ const value={id:c.id,name:c.name,label:activityLabel(c.name,c.arguments||{}),path:clean(c.arguments?.path||c.arguments?.file_path||''),command:clean(c.arguments?.command||''),status:'pending',images:[]};
+ if(c.name==='subagent'||c.name==='subagent_wait'||c.name==='subagent_cancel')value.subagent={agent:clean(c.arguments?.agent||''),task:clean(c.arguments?.task||''),background:c.arguments?.background!==false};
+ return value;
+}
 export function publicMessage(message){
  if(message?.role==='compactionSummary'||message?.role==='branchSummary'){
   const summary=String(message.summary||'');
   return {role:'summary',kind:message.role==='compactionSummary'?'compaction':'branch',text:summary,summaryText:summary,tokensBefore:Number.isFinite(message.tokensBefore)?message.tokensBefore:undefined,timestamp:message.timestamp,status:'done'};
+ }
+ if(message?.role==='custom'){
+  const content=typeof message.content==='string'?[{type:'text',text:message.content}]:message.content||[];
+  return {role:'custom',customType:message.customType,text:content.filter(c=>c.type==='text').map(c=>c.text).join('\n'),details:message.details,timestamp:message.timestamp,status:'done'};
  }
  const content=typeof message.content==='string'?[{type:'text',text:message.content}]:message.content||[];
  return {role:message.role,timestamp:message.timestamp,text:content.filter(c=>c.type==='text').map(c=>c.text).join('\n'),thinking:content.filter(c=>c.type==='thinking').map(c=>c.thinking||'').join('\n'),tools:content.filter(c=>c.type==='toolCall').map(toolView),error:message.errorMessage?clean(message.errorMessage):undefined,status:message.stopReason==='error'?'error':message.stopReason==='aborted'?'stopped':'done',usage:message.usage?{input:message.usage.input,output:message.usage.output}:undefined};
@@ -13,11 +21,12 @@ export function publicMessage(message){
 export function updateTool(tool,event){
  const details=event.result?.details||event.partialResult?.details;
  const images=Array.isArray(details?.images)?details.images:details?.image?[details.image]:tool.images||[];
- return {...tool,status:event.type==='tool_execution_end'?(event.isError?'error':'done'):'running',output:output(event.result||event.partialResult)||tool.output,images,started:tool.started||Date.now(),ended:event.type==='tool_execution_end'?Date.now():undefined};
+ const subagents=Array.isArray(details?.subagents)?details.subagents:tool.subagents;
+ return {...tool,status:event.type==='tool_execution_end'?(event.isError?'error':'done'):'running',output:output(event.result||event.partialResult)||tool.output,images,subagents,started:tool.started||Date.now(),ended:event.type==='tool_execution_end'?Date.now():undefined};
 }
 export function publicMessages(messages){
  const results=new Map(messages.filter(m=>m.role==='toolResult').map(m=>[m.toolCallId,m]));
- return messages.filter(m=>['user','assistant','compactionSummary','branchSummary'].includes(m.role)).map(m=>{const value=publicMessage(m);if(value.tools?.length)value.tools=value.tools.map(t=>{const result=results.get(t.id);if(!result)return t;const details=result.details;const images=Array.isArray(details?.images)?details.images:details?.image?[details.image]:t.images||[];return {...t,status:result.isError?'error':'done',output:output(result),images};});return value;});
+ return messages.filter(m=>['user','assistant','compactionSummary','branchSummary','custom'].includes(m.role)).map(m=>{const value=publicMessage(m);if(value.tools?.length)value.tools=value.tools.map(t=>{const result=results.get(t.id);if(!result)return t;const details=result.details;const images=Array.isArray(details?.images)?details.images:details?.image?[details.image]:t.images||[];const subagents=Array.isArray(details?.subagents)?details.subagents:t.subagents;return {...t,status:result.isError?'error':'done',output:output(result),images,subagents};});return value;});
 }
 // Provider snapshots can shrink or replace text after a retry. Keep the visible
 // draft as a labelled previous version, without sending it back to the model.

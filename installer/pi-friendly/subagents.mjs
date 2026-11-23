@@ -263,6 +263,14 @@ export function createSubagentService({
   const runtime = new Map();
   let backgroundJobs = 0;
   let emitTimer;
+  const stopAllOnExit = () => {
+    for (const { stop } of runtime.values()) {
+      try {
+        stop();
+      } catch {}
+    }
+  };
+  process.once('exit', stopAllOnExit);
   let heartbeat;
 
   const publicEntry = (entry) => ({
@@ -665,6 +673,7 @@ export function createSubagentService({
   }
 
   function dispose() {
+    process.removeListener('exit', stopAllOnExit);
     clearTimeout(emitTimer);
     clearInterval(heartbeat);
     heartbeat = undefined;
@@ -752,15 +761,38 @@ export function createSubagentService({
 /* ============================== pi registration ============================== */
 
 export function installSubagents(pi, { Type, cli, builtinDir = BUILTIN_AGENTS_DIR, userDir, emit, env = process.env, spawnProcess = spawn } = {}) {
-  const service = createSubagentService({ cli, emit, env, spawnProcess, builtinDir });
+  const sendResult = (payload) => {
+    if (typeof pi.sendMessage !== 'function') return;
+    const result = payload?.result || {};
+    const text = (result.content || [])
+      .filter((part) => part?.type === 'text')
+      .map((part) => part.text)
+      .join('\n')
+      .trim();
+    if (!text) return;
+    try {
+      pi.sendMessage(
+        {
+          customType: 'friendly-subagent',
+          content: text,
+          display: true,
+          details: { ...(result.details || {}), background: true },
+        },
+        { deliverAs: 'followUp', triggerTurn: true },
+      );
+    } catch {}
+  };
+  const service = createSubagentService({ cli, emit, env, spawnProcess, builtinDir, onComplete: sendResult });
   pi.registerTool({
     name: 'subagent',
     label: 'Субагент',
     description: [
       'Delegate a task to an isolated subagent process with its own context window.',
       'Modes: single (agent + task), parallel (tasks array), chain (sequential steps with {previous} placeholder).',
+      'By default the subagent runs in the background: the tool returns a receipt immediately and the result arrives later as a follow-up message, so you can keep working.',
+      'If you need the result before continuing, pass background:false, or call subagent_wait with the ids.',
       'Default agents: scout (fast code recon), planner (implementation plan), worker (full capabilities), reviewer (code review).',
-      'Use for research, planning, parallel exploration or review. The final answer and live progress stay visible in the web panel.',
+      'Use for research, planning, parallel exploration or review. The live progress is visible in the web panel.',
     ].join(' '),
     parameters: Type.Object({
       agent: Type.Optional(Type.String({ description: 'Agent name for single mode: scout, planner, worker or reviewer' })),
@@ -786,22 +818,70 @@ export function installSubagents(pi, { Type, cli, builtinDir = BUILTIN_AGENTS_DI
       agentScope: Type.Optional(
         Type.String({ enum: ['user', 'project', 'both'], description: 'Agent directories: built-in + user (default), project, or both' }),
       ),
+      background: Type.Optional(
+        Type.Boolean({ description: 'Run in the background and deliver the result as a follow-up message (default true). Pass false to wait for the result.' }),
+      ),
     }),
     async execute(_id, params, signal, onUpdate, ctx) {
+      const background = params.background !== false;
       try {
-        return await service.run(params, {
-          cwd: ctx.cwd,
-          model: ctx.model,
-          thinkingLevel: ctx.thinkingLevel,
-          signal,
-          onUpdate,
-          userDir,
-          builtinDir,
-        });
+        return await service.run(
+          { ...params, background },
+          {
+            cwd: ctx.cwd,
+            model: ctx.model,
+            thinkingLevel: ctx.thinkingLevel,
+            signal: background ? undefined : signal,
+            onUpdate: background ? undefined : onUpdate,
+            userDir,
+            builtinDir,
+          },
+        );
       } catch (error) {
         return { content: [{ type: 'text', text: `Субагент не запустился: ${error.message}` }] };
       }
     },
   });
+
+  pi.registerTool({
+    name: 'subagent_wait',
+    label: 'Ждать субагента',
+    description: 'Wait for background subagents to finish and return their results. Optionally pass ids from the subagent receipt.',
+    parameters: Type.Object({
+      ids: Type.Optional(Type.Array(Type.String({ description: 'Subagent ids to wait for; all running subagents when omitted' }))),
+      timeoutMs: Type.Optional(Type.Number({ description: 'Maximum wait in milliseconds (default 120000)' })),
+    }),
+    async execute(_id, params) {
+      const list = await service.waitFor({ ids: params.ids, timeoutMs: Number(params.timeoutMs) || 120000 });
+      const finished = list.filter((entry) => entry.status !== 'running');
+      if (!finished.length) {
+        return { content: [{ type: 'text', text: 'Субагенты ещё работают. Результат придёт отдельным сообщением.' }], details: { subagents: service.snapshot() } };
+      }
+      const text = finished
+        .map((entry) => `### ${entry.agent} — ${entry.status === 'done' ? 'готово' : entry.status === 'stopped' ? 'остановлен' : 'ошибка'}\n\n${entry.output || entry.error || '(нет вывода)'}`)
+        .join('\n\n---\n\n');
+      return {
+        content: [{ type: 'text', text: capBytes(text, 12000) }],
+        details: { subagents: service.snapshot() },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: 'subagent_cancel',
+    label: 'Остановить субагента',
+    description: 'Stop running subagents. Optionally pass ids; without ids stops every running subagent in this chat.',
+    parameters: Type.Object({
+      ids: Type.Optional(Type.Array(Type.String({ description: 'Subagent ids to stop' }))),
+    }),
+    async execute(_id, params) {
+      const stopped = service.cancel({ ids: params.ids });
+      return {
+        content: [{ type: 'text', text: stopped ? `Остановлено субагентов: ${stopped}.` : 'Активных субагентов нет.' }],
+        details: { subagents: service.snapshot() },
+      };
+    },
+  });
+
   return service;
 }

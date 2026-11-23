@@ -63,7 +63,6 @@
       <div class="sidebar-bottom">
         <div id="voice-setup" role="status"></div>
         <div id="quota" class="quota" role="status"></div>
-        <div id="context-usage" class="context-usage" role="status" hidden></div>
         <div class="sidebar-actions">
           <button type="button" id="billing-open" title="Баланс и пополнение">
             <span class="nav-icon" data-icon="wallet" aria-hidden="true"></span>
@@ -139,14 +138,8 @@
                 <span>Модель</span>
               </button>
               <div class="composer-actions">
-                <button type="button" id="image-open" title="Изображения" aria-label="Изображения">
-                  <span data-icon="image" aria-hidden="true"></span>
-                </button>
                 <button type="button" id="attach" title="Загрузить файлы в папку проекта" aria-label="Загрузить файлы">
                   <span data-icon="attach" aria-hidden="true"></span>
-                </button>
-                <button type="button" id="compact" title="Сжать историю разговора" aria-label="Сжать историю разговора" hidden>
-                  <span data-icon="compress" aria-hidden="true"></span>
                 </button>
                 <button type="button" id="mic" title="Голосовой ввод с микрофона этого компьютера" aria-label="Начать диктовку" hidden>
                   <span data-icon="mic" aria-hidden="true"></span>
@@ -156,6 +149,9 @@
                 </button>
                 <button type="submit" id="send" class="send" title="Отправить — Enter" aria-label="Отправить">
                   <span data-icon="arrow-up" aria-hidden="true"></span>
+                </button>
+                <button type="button" id="chat-menu-open" class="chat-menu-open" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-menu" title="Ещё действия" aria-label="Ещё действия">
+                  <span data-icon="more" aria-hidden="true"></span>
                 </button>
               </div>
             </div>

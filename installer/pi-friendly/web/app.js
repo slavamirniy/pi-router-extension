@@ -40,6 +40,7 @@ const paths = {
   "volume-off": "M11 5 6 9H2v6h4l5 4V5Zm5 3 6 6m0-6-6 6",
   stop: "M7 7h10v10H7z",
   refresh: "M20 7v-4l-4 1 M20 7a8 8 0 1 0 1 9",
+  more: "M12 6h.01M12 12h.01M12 18h.01",
   compress: "M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5",
   trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   file: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Zm0 0v6h6",
@@ -199,6 +200,12 @@ modelMenu.setAttribute("popover", "auto");
 modelMenu.setAttribute("role", "dialog");
 modelMenu.setAttribute("aria-label", "Выбор модели");
 document.body.append(modelMenu);
+const chatMenu = el("div", null, "chat-menu");
+chatMenu.id = "chat-menu";
+chatMenu.setAttribute("popover", "auto");
+chatMenu.setAttribute("role", "dialog");
+chatMenu.setAttribute("aria-label", "Действия с чатом");
+document.body.append(chatMenu);
 
 const draftKey = (id) => "pf-draft-" + (id || "new");
 function saved(id) {
@@ -969,7 +976,6 @@ function wireChrome() {
     event.preventDefault();
     navigate("projects");
   };
-  $("image-open").onclick = () => openImagePanel();
   $("image-gallery-open").onclick = () => openImagePanel();
   $("subagents-toggle").onclick = () => {
     subagentsCollapsed = !subagentsCollapsed;
@@ -1245,9 +1251,18 @@ function wireChrome() {
   $("attach").onclick = () => {
     if (!$("attach").disabled) pickAttachments();
   };
-  $("compact").onclick = () => {
-    if (!$("compact").disabled) compactConversation();
+  $("chat-menu-open").onclick = () => {
+    if ($("chat-menu").matches(":popover-open")) {
+      $("chat-menu").hidePopover();
+      return;
+    }
+    renderChatMenu();
+    positionChatMenu();
+    $("chat-menu").showPopover();
   };
+  chatMenu.addEventListener("toggle", () => {
+    $("chat-menu-open").setAttribute("aria-expanded", String(chatMenu.matches(":popover-open")));
+  });
   const toggleVoice = (target) => {
     voiceTarget = target;
     if (target === "chat" && state.voice?.phase === "recording") onboarding.dictated();
@@ -1295,6 +1310,7 @@ function wireChrome() {
   });
   window.addEventListener("resize", () => {
     if (modelMenu.matches(":popover-open")) positionModels();
+    if (chatMenu.matches(":popover-open")) positionChatMenu();
   });
   const reloadDialog = $("reload-dialog");
   function askReload() {
@@ -2400,7 +2416,71 @@ function messageSignature() {
     state.active?.readOnly,
     state.active?.id,
     state.ready,
+    (state.subagents || []).map((entry) => `${entry.id}:${entry.status}:${(entry.items || []).length}`).join("|"),
   ]);
+}
+
+function subagentToolCard(tool) {
+  const ids = new Set((tool.subagents || []).map((entry) => entry.id));
+  let entries = (state.subagents || []).filter((entry) => ids.has(entry.id));
+  if (!entries.length) entries = tool.subagents || [];
+  const live = entries.some((entry) => entry.status === "running")
+    ? "running"
+    : entries.length && entries.every((entry) => entry.status === "error" || entry.status === "stopped")
+      ? "error"
+      : tool.status || "running";
+  const card = el("div", null, "subagent-tool " + live);
+  const head = el("div", null, "subagent-tool-head");
+  head.append(el("span", null, "tool-dot"));
+  const title =
+    entries.length > 1
+      ? `Субагенты · ${entries.length}`
+      : entries[0]?.agent || tool.subagent?.agent || "Субагент";
+  head.append(el("strong", title, "subagent-tool-name"));
+  const labels = { pending: "ожидает", running: "работает", done: "готово", error: "ошибка", stopped: "остановлен" };
+  head.append(el("span", labels[live] || live || "", "subagent-tool-state"));
+  const openEntry = [...entries].reverse().find((entry) => entry.status === "running") || entries.at(-1);
+  if (openEntry?.id) {
+    const open = el("button", "Открыть", "subagent-open");
+    open.type = "button";
+    open.onclick = () => openSubagent(openEntry.id);
+    head.append(open);
+  }
+  card.append(head);
+  if (tool.subagent?.task && entries.length <= 1) {
+    const task = el("p", tool.subagent.task, "subagent-tool-task");
+    task.title = tool.subagent.task;
+    card.append(task);
+  }
+  if (entries.length > 1) {
+    for (const entry of entries.slice(0, 4)) {
+      const row = el("div", null, "subagent-tool-row " + (entry.status || "running"));
+      row.append(el("span", null, "tool-dot"), el("span", entry.agent, "subagent-tool-row-name"));
+      const note = subagentShort(entry.current || (entry.status === "done" ? "готово" : entry.error || ""), 80);
+      if (note) row.append(el("span", note, "subagent-tool-row-note"));
+      card.append(row);
+    }
+  } else if (entries[0]) {
+    const note = entries[0].current || (entries[0].status === "done" ? "Результат готов" : entries[0].error || "");
+    if (note) card.append(el("p", subagentShort(note, 160), "subagent-tool-now"));
+  } else if (tool.output) {
+    card.append(el("p", subagentShort(tool.output, 160), "subagent-tool-now"));
+  }
+  return card;
+}
+
+function subagentResultHead(message) {
+  const head = el("div", null, "subagent-result-head");
+  head.append(el("span", null, "subagent-dot done"), el("span", "Результат субагента", "subagent-result-title"));
+  const entries = message.details?.subagents || [];
+  const last = [...entries].reverse().find((entry) => entry.status === "done") || entries.at(-1);
+  if (last?.id) {
+    const open = el("button", "Открыть", "subagent-open");
+    open.type = "button";
+    open.onclick = () => openSubagent(last.id);
+    head.append(open);
+  }
+  return head;
 }
 
 function renderMessages() {
@@ -2540,6 +2620,13 @@ function renderMessages() {
       }
       assistantText += (assistantText && message.text ? "\n\n" : "") + (message.text || "");
       assistantStreaming = message.status === "streaming";
+      if (message.role === "custom" && message.customType === "friendly-subagent") {
+        content.append(subagentResultHead(message));
+        const answer = el("div", null, "answer");
+        markdown(answer, message.text || "");
+        content.append(answer);
+        return;
+      }
       if (message.thinking) {
         const body = el("div", null, "reasoning-text");
         markdown(body, message.thinking);
@@ -2564,6 +2651,10 @@ function renderMessages() {
       for (const tool of message.tools || []) {
         const status = tool.status || "pending";
         if (status === "running" || status === "pending") assistantRunningTools = true;
+        if (tool.name === "subagent" && tool.subagent) {
+          content.append(subagentToolCard(tool));
+          continue;
+        }
         const labels = { pending: "ожидает", running: "выполняется", done: "готово", error: "ошибка", stopped: "остановлено" };
         const body = el("div", null, "tool-detail");
         if (tool.path) body.append(el("p", tool.path, "file-path"));
@@ -4070,6 +4161,63 @@ function compactConversation() {
   });
 }
 
+/* ============================== chat actions menu ============================== */
+
+function chatMenuItem({ iconName, label, hint, disabled, action }) {
+  const button = el("button", null, "chat-menu-item");
+  button.type = "button";
+  button.disabled = Boolean(disabled);
+  const mark = el("span", null, "chat-menu-icon");
+  mark.append(icon(iconName));
+  const copy = el("span", null, "chat-menu-copy");
+  copy.append(el("span", label, "chat-menu-label"));
+  if (hint) copy.append(el("span", hint, "chat-menu-hint"));
+  button.append(mark, copy);
+  button.onclick = () => {
+    chatMenu.hidePopover();
+    action();
+  };
+  return button;
+}
+
+function renderChatMenu() {
+  const readOnly = Boolean(state.active?.readOnly);
+  const busy = Boolean(state.busy);
+  const compacting = Boolean(state.compacting);
+  const hasHistory = Boolean(state.messages?.some((message) => message.role === "user"));
+  const noChat = !state.active || readOnly;
+  chatMenu.replaceChildren(
+    chatMenuItem({
+      iconName: "image",
+      label: "Генератор картинок",
+      hint: readOnly ? "Доступно в чате проекта" : "Создать или изменить изображение",
+      disabled: noChat,
+      action: () => openImagePanel(),
+    }),
+    chatMenuItem({
+      iconName: "compress",
+      label: compacting ? "Оптимизирую чат…" : "Оптимизировать чат",
+      hint: !hasHistory
+        ? "История пока пуста"
+        : busy
+          ? "Дождитесь окончания ответа"
+          : "Сжать историю и освободить контекст",
+      disabled: noChat || busy || compacting || !hasHistory,
+      action: () => compactConversation(),
+    }),
+  );
+}
+
+function positionChatMenu() {
+  const rect = $("chat-menu-open").getBoundingClientRect();
+  const width = Math.min(300, innerWidth - 24);
+  chatMenu.style.width = width + "px";
+  chatMenu.style.left = Math.max(12, Math.min(rect.right - width, innerWidth - width - 12)) + "px";
+  chatMenu.style.top = "auto";
+  chatMenu.style.bottom = Math.max(12, innerHeight - rect.top + 8) + "px";
+  chatMenu.style.maxHeight = Math.max(120, rect.top - 24) + "px";
+}
+
 function forkMessage(index, text) {
   if (!state.active) return;
   if (!canSwitch()) return;
@@ -4125,18 +4273,12 @@ function renderStatus() {
   $("draft").disabled = Boolean(readOnly || !connected);
   $("attach").hidden = !(page === "chat" && state.active && !readOnly);
   $("attach").disabled = !connected || readOnly;
-  const compact = $("compact");
-  if (compact) {
-    const hasHistory = Boolean(state.messages?.some((message) => message.role === "user"));
-    const compacting = Boolean(state.compacting);
-    compact.hidden = !(page === "chat" && state.active && !readOnly);
-    compact.disabled = !connected || readOnly || busy || navigating || recording || !ready || !hasHistory || compacting;
-    compact.title = compacting
-      ? "Сжимаю историю разговора…"
-      : busy
-        ? "Сжать историю можно после завершения ответа"
-        : "Сжать историю разговора: старые сообщения заменятся кратким пересказом";
-    compact.setAttribute("aria-busy", String(compacting));
+  const chatMenuButton = $("chat-menu-open");
+  if (chatMenuButton) {
+    chatMenuButton.hidden = !(page === "chat" && state.active && !readOnly);
+    chatMenuButton.disabled = !connected;
+    chatMenuButton.title = "Генератор картинок и оптимизация чата";
+    if (!chatMenuButton.hidden && chatMenu.matches(":popover-open")) renderChatMenu();
   }
   $("mic").disabled = !connected || !state.active || readOnly || voice?.phase === "transcribing";
   $("mic").hidden = !voiceIsAvailable(voice?.phase);
@@ -4172,7 +4314,6 @@ function renderStatus() {
   renderQuestions();
   renderVoice(voice, recording);
   renderQuota();
-  renderContextUsage();
   showError(state.error && !state.messages?.some((message) => message.error === state.error) ? state.error : "");
   $("notice").textContent = state.notice || "";
   $("notice").hidden = !state.notice;
@@ -4227,28 +4368,6 @@ function renderVoice(voice, recording) {
       setup.append(progress);
     }
   }
-}
-
-function renderContextUsage() {
-  const node = $("context-usage");
-  if (!node) return;
-  const usage = state.contextUsage;
-  const percent = usage?.percent;
-  const tokens = usage?.tokens;
-  const windowSize = usage?.contextWindow;
-  if (typeof percent !== "number" || !Number.isFinite(percent) || percent < 0) {
-    node.hidden = true;
-    node.textContent = "";
-    node.classList.remove("high");
-    return;
-  }
-  node.hidden = false;
-  node.textContent = `Контекст ${Math.min(100, Math.round(percent))}%`;
-  node.title =
-    typeof tokens === "number" && typeof windowSize === "number" && Number.isFinite(tokens) && Number.isFinite(windowSize)
-      ? `${tokens.toLocaleString("ru-RU")} из ${windowSize.toLocaleString("ru-RU")} токенов`
-      : "Заполнение контекстного окна модели";
-  node.classList.toggle("high", percent >= 80);
 }
 
 function renderQuota() {
