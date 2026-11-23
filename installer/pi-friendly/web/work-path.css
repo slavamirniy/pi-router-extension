@@ -1,42 +1,43 @@
 .work-path-card {
-  margin: 6px 0;
+  margin: 8px 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
 }
-.work-path-card summary {
+/* The fold control is a step above the 11px mono labels of the steps it hides. */
+.work-path-card > summary {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   width: fit-content;
   max-width: 100%;
-  min-height: 24px;
-  padding: 2px 5px 2px 3px;
-  border-radius: 4px;
-  color: var(--text-2);
-  font: 11px/1.4 var(--mono);
+  min-height: 26px;
+  padding: 3px 7px 3px 5px;
+  border-radius: 6px;
+  color: var(--text);
+  font: 500 12.5px/1.4 var(--font);
   cursor: pointer;
   list-style: none;
 }
-.work-path-card summary::-webkit-details-marker {
+.work-path-card > summary::-webkit-details-marker {
   display: none;
 }
-.work-path-card summary::before {
+.work-path-card > summary::before {
   content: "›";
-  color: var(--disabled);
-  font-size: 14px;
+  color: var(--muted);
+  font-size: 16px;
   line-height: 1;
   transition: transform 80ms linear;
 }
-.work-path-card[open] summary::before {
+.work-path-card[open] > summary::before {
   transform: rotate(90deg);
 }
-.work-path-card summary:hover {
+.work-path-card > summary:hover {
   background: var(--surface);
 }
 .work-path {
   display: grid;
   gap: 2px;
-  margin: 2px 0 4px;
+  margin: 3px 0 4px;
   padding-left: 2px;
 }
 .work-path .answer {

@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/slavamirniy/pi-friendly",
-  "revision": "3cbef8542e054bbf16b012e148be104d5d503704",
-  "version": "0.17.7",
+  "revision": "b3039021df5e2b1565000adff745577246f2c0a3",
+  "version": "0.17.8",
   "embeddedRouter": true,
   "files": {
     "LICENSE": "7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd",
@@ -24,7 +24,7 @@
     "model-picker.mjs": "b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689",
     "model-preference.mjs": "91ab8ecfa8c38ab0dc103fadd60de50993d435ebb77a38408a5eb5a220cfd2af",
     "mouse.mjs": "4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0",
-    "package.json": "7932c6ca5559959008bd9d3fdd046fd5729095ff48807c320fe00f77881a15f3",
+    "package.json": "6f4e652b92eef5208c188ac5571d1296d95cdcad3277db99de1e5f5e30fac30a",
     "project-form.mjs": "990d61dab347a589bfe9c6bdd5f066c082b1d02f1b1487f92d4e41df573bc6c0",
     "projects.mjs": "a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03",
     "router/LICENSE": "7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710",
@@ -66,7 +66,7 @@
     "web/message-versions.js": "b6648f6b4ba3968a4d0df0ba06ba27135581cbfbaf4d828c1299fdf6b4f1a7fa",
     "web/onboarding.js": "69954d60f5549bd20062f05f5fbda253d446a4bcc1de3df3cab99a06c222a7da",
     "web/sounds/done.mp3": "cfe22294469460f0cef050cbf533c8f66074cc8e63982d7ec0bbb3d2f7b57ab4",
-    "web/work-path.css": "4440113acff6008dcd053a474ad2f013ff69bb2ff25c1b714d7e34dc6e941b11",
+    "web/work-path.css": "370f3f0415ad0aa40989b5c336843e863d4050cf30d8b50ab5ec6060daccbc22",
     "web/work-path.js": "cb9f4d5ab49b2df68132ce6b9a77ac264bbb25ba58bcbaf23e7d1ee9a0d5f2ea",
     "workspace.mjs": "d08cbc9e280207dcf05ba038cd164823ab292b3213599423984736b9dc3c2941"
   }
