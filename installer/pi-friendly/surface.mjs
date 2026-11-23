@@ -58,7 +58,7 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
   const put=(y,text,bg=p.canvas,fg=p.text)=>{if(y>=0&&y<height)right[y]=paint('',pad)+paint(text,cw,bg,fg)+paint('',main-pad-cw);};
   const bold=text=>`\x1b[1m${text}\x1b[22m`;
   const center=(text,w)=>' '.repeat(Math.max(0,Math.floor((w-measure(text))/2)))+text;
-  left[1]=paint('  '+bold('Просто pi'),side,p.sidebar,p.text);
+  left[1]=paint('  '+bold('AI DIY'),side,p.sidebar,p.text);
   const button=(y,label,run,primary=false,danger=false,disabled=false)=>{
    if(y<3||y+2>=height)return;
    const returning=primary&&run===actions.newChat&&s.paneOpen;
@@ -69,7 +69,7 @@ export function createSurface({tui,delegate,rendering,ctx,actions,state}) {
   };
   const exitY=height-3,footerY=height-6;
   const themeX=side-5,themeIcon=s.scheme==='dark'?'☀':'☾';
-  left[1]=paint('  '+bold('Просто pi'),themeX,p.sidebar,p.text)+paint(centered(themeIcon,4,truncate,measure),4,hovering(themeX,0,4,3)?p.button:p.sidebar,p.accent)+paint('',1,p.sidebar);
+  left[1]=paint('  '+bold('AI DIY'),themeX,p.sidebar,p.text)+paint(centered(themeIcon,4,truncate,measure),4,hovering(themeX,0,4,3)?p.button:p.sidebar,p.accent)+paint('',1,p.sidebar);
   targets.push({x:themeX,y:0,w:4,h:3,run:actions.theme});
   if(height>=21){
    button(4,s.paneOpen?'Вернуться к чату':side<24?'Новый чат':'Новый разговор',actions.newChat,true);

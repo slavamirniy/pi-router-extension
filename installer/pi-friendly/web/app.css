@@ -222,6 +222,11 @@ svg {
   color: var(--bg);
   font: italic 16px/1 Georgia, serif;
 }
+img.brand-mark {
+  display: block;
+  object-fit: cover;
+  background: #0b1a33;
+}
 .brand-name {
   font-size: 13.5px;
   font-weight: 600;
@@ -683,6 +688,10 @@ svg {
   min-width: 32px !important;
   padding: 0 !important;
   justify-content: center;
+}
+#sound.muted {
+  color: var(--muted);
+  opacity: 0.75;
 }
 .quota {
   padding: 4px 10px 0;
@@ -1843,9 +1852,16 @@ h1 {
   height: 36px;
   margin: 0 auto 12px;
   border-radius: 8px;
-  background: var(--text);
+  background: #0b1a33;
   color: var(--bg);
   font: italic 21px/1 Georgia, serif;
+  overflow: hidden;
+}
+.welcome-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .welcome h2 {
   margin: 0 0 4px;
@@ -4787,9 +4803,16 @@ button.image-job-visual { cursor: pointer; }
   height: 44px;
   margin: 0 auto;
   border-radius: 12px;
-  background: var(--text);
+  background: #0b1a33;
   color: var(--bg);
   font: italic 26px/1 Georgia, serif;
+  overflow: hidden;
+}
+.onboarding-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .onboarding h1 {
   margin: 0;

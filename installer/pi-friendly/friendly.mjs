@@ -31,7 +31,7 @@ export function installFriendly(pi, rendering) {
   const hasProject=ctx=>!projects||(projects.isProject?.(currentFolder(ctx))??!projects.isHub(currentFolder(ctx)));
   let restoreUI = () => {}, noticeTimer;
   let opened = false, footerData, activeMenu, startupTimer, stopped = false, workspace, footerRows = 1;
-  pi.registerFlag("friendly-no-welcome", { description: "Не открывать стартовое меню Просто pi", type: "boolean", default: false });
+  pi.registerFlag("friendly-no-welcome", { description: "Не открывать стартовое меню AI DIY", type: "boolean", default: false });
   pi.registerFlag("friendly-keep-footer", { description: "Сохранить footer другого расширения (без кликабельных slash-подсказок)", type: "boolean", default: false });
   const statuses = () => [...(footerData?.getExtensionStatuses().values() ?? [])].filter(Boolean);
   const modelLabel = ctx => clean(ctx.model?.name || ctx.model?.id || "Модель не выбрана");
@@ -233,7 +233,7 @@ export function installFriendly(pi, rendering) {
   }
   async function menu(ctx) {
     const active = Boolean(ctx.ui.getEditorText().trim() || ctx.sessionManager?.getEntries().some(entry => entry.type === "message"));
-    const action = await dialog(ctx, () => choose(ctx, "Просто pi", [
+    const action = await dialog(ctx, () => choose(ctx, "AI DIY", [
       { id: "web", label: "Открыть веб-интерфейс", description: "Более удобный и наглядный интерфейс в браузере" },
       { id: "new", label: "Новый разговор", description: "Начать с чистого листа" },
       { id: "history", label: "Проекты и чаты", description: "Открыть проект или любой разговор" },
@@ -244,7 +244,7 @@ export function installFriendly(pi, rendering) {
     if (action?.id === "history") await command(ctx, "/friendly history");
   }
   pi.registerCommand("friendly", { description: "Новый разговор и история по проектам", handler: async (args, ctx) => safe(ctx, () => args.startsWith("open ") ? switchChat(ctx,decodeURIComponent(args.slice(5))) : args.trim()==="balance" ? balance(ctx) : args.trim()==="web" ? rendering.openWeb?.(ctx,voice,statuses) : args.trim()==="new" ? newConversation(ctx) : args.trim() === "history" ? history(ctx) : args.trim() === "commands" ? commands(ctx) : menu(ctx))() });
-  pi.registerShortcut("f2", { description: "Открыть меню Просто pi", handler: ctx => safe(ctx, () => menu(ctx))() });
+  pi.registerShortcut("f2", { description: "Открыть меню AI DIY", handler: ctx => safe(ctx, () => menu(ctx))() });
   pi.on("input",(event,ctx)=>{
     if(ctx.mode==='tui'&&event.source!=='extension'&&rendering.isWebActive?.())return {action:'handled'};
     if(ctx.mode!=="tui"||hasProject(ctx))return;

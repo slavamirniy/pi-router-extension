@@ -1,4 +1,4 @@
-// Subagents for «Просто pi».
+// Subagents for «AI DIY».
 //
 // Adapted from the pi example extension snapshotted in ./vendor/pi-subagent
 // (pi-coding-agent 0.84.4, MIT). The vendored copy is the fixed reference;
@@ -257,9 +257,11 @@ export function createSubagentService({
   emitDelay = 80,
   heartbeatMs = 2000,
   outputCap = OUTPUT_CAP,
+  onComplete = () => {},
 } = {}) {
   const entries = new Map();
   const runtime = new Map();
+  let backgroundJobs = 0;
   let emitTimer;
   let heartbeat;
 
@@ -562,7 +564,7 @@ export function createSubagentService({
     } catch {}
   }
 
-  async function run(params = {}, context = {}) {
+  async function executeRun(params = {}, context = {}) {
     const { cwd, model, thinkingLevel, signal, onUpdate, userDir, builtinDir: agentsDir = builtinDir } = context;
     const scope = params.agentScope === 'project' || params.agentScope === 'both' ? params.agentScope : 'user';
     const { agents } = discoverAgents({ cwd, userDir, builtinDir: agentsDir, scope });
@@ -674,7 +676,77 @@ export function createSubagentService({
     runtime.clear();
   }
 
-  return { run, snapshot, dispose, discover: discoverAgents };
+  async function run(params = {}, context = {}) {
+    if (!params.background) return executeRun(params, context);
+    const before = new Set(entries.keys());
+    backgroundJobs += 1;
+    const promise = executeRun(params, context);
+    const ids = [...entries.keys()].filter((id) => !before.has(id));
+    if (!ids.length) {
+      const result = await promise;
+      backgroundJobs -= 1;
+      return result;
+    }
+    promise
+      .then((result) => {
+        backgroundJobs -= 1;
+        try {
+          onComplete({ result, ids, subagents: snapshot() });
+        } catch {}
+      })
+      .catch((error) => {
+        backgroundJobs -= 1;
+        try {
+          onComplete({
+            result: {
+              content: [{ type: 'text', text: `Субагент не справился: ${error.message}` }],
+              details: { subagents: snapshot() },
+            },
+            ids,
+            subagents: snapshot(),
+          });
+        } catch {}
+      });
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Субагент запущен в фоне. Результат придёт отдельным сообщением; если он нужен сразу, вызовите subagent_wait.`,
+        },
+      ],
+      details: { background: true, subagents: snapshot().filter((entry) => ids.includes(entry.id)) },
+    };
+  }
+
+  async function waitFor({ ids, timeoutMs = 120000, pollMs = 150 } = {}) {
+    const wanted = Array.isArray(ids) && ids.length ? new Set(ids) : null;
+    const started = now();
+    const pending = () =>
+      backgroundJobs > 0 ||
+      [...entries.values()].some(
+        (entry) => entry.status === 'running' && (!wanted || wanted.has(entry.id)),
+      );
+    while (pending()) {
+      if (now() - started > timeoutMs) break;
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+    return [...entries.values()].filter((entry) => !wanted || wanted.has(entry.id));
+  }
+
+  function cancel({ ids } = {}) {
+    const wanted = Array.isArray(ids) && ids.length ? new Set(ids) : null;
+    let stopped = 0;
+    for (const [id, { stop }] of runtime) {
+      if (wanted && !wanted.has(id)) continue;
+      try {
+        stop();
+        stopped += 1;
+      } catch {}
+    }
+    return stopped;
+  }
+
+  return { run, waitFor, cancel, snapshot, dispose, discover: discoverAgents };
 }
 
 /* ============================== pi registration ============================== */

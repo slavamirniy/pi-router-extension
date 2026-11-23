@@ -1,6 +1,8 @@
 import { createBillingUI } from "./billing-ui.js";
 import { createVersionManager } from "./message-versions.js";
 import { splitAttachments, buildOutgoingText } from "./attachments.js";
+import { BRAND_ICON } from "./brand-icon.js";
+import { FAVICON_COLORS, windowStatus, windowTitle } from "./chrome.js";
 import { createOnboarding, voiceIsAvailable } from "./onboarding.js";
 
 const billingUI = createBillingUI();
@@ -34,6 +36,8 @@ const paths = {
   attach:
     "m20 11-8 8a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8",
   mic: "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0Zm-3 6v1a6 6 0 0 0 12 0v-1m-6 7v4m-3 0h6",
+  volume: "M11 5 6 9H2v6h4l5 4V5Zm4.5 3.5a5 5 0 0 1 0 7.1M19 5a9 9 0 0 1 0 14",
+  "volume-off": "M11 5 6 9H2v6h4l5 4V5Zm5 3 6 6m0-6-6 6",
   stop: "M7 7h10v10H7z",
   refresh: "M20 7v-4l-4 1 M20 7a8 8 0 1 0 1 9",
   compress: "M4 9V4h5M20 15v5h-5M15 4h5v5M9 20H4v-5",
@@ -84,6 +88,25 @@ let catalog = [];
 let catalogLoading = true;
 let catalogError = "";
 let state = {};
+let soundEnabled = true;
+try {
+  soundEnabled = localStorage.getItem("pf-sound") !== "off";
+} catch {}
+let audioContext = null;
+let audioBuffer = null;
+let audioLoading = null;
+let doneAt = 0;
+let doneUnread = false;
+let doneTimer = null;
+const faviconCache = new Map();
+const brandImage = new Image();
+let brandReady = false;
+brandImage.onload = () => {
+  brandReady = true;
+  faviconCache.clear();
+  renderWindowChrome();
+};
+brandImage.src = BRAND_ICON;
 let tabId = crypto.randomUUID();
 let allowUnload = false;
 let source;
@@ -1341,6 +1364,20 @@ function wireChrome() {
   } catch {
     setTheme("light", false);
   }
+  renderSoundButton();
+  $("sound").onclick = () => {
+    soundEnabled = !soundEnabled;
+    try {
+      localStorage.setItem("pf-sound", soundEnabled ? "on" : "off");
+    } catch {}
+    renderSoundButton();
+    if (soundEnabled) {
+      unlockChime();
+      const loading = audioLoading;
+      if (loading) void loading.then(() => playDoneChime());
+      else playDoneChime();
+    }
+  };
   renderAttachments();
   wireDropZone();
   wireOnboarding();
@@ -2600,7 +2637,13 @@ function renderMessages() {
   }
   if (!frag.childNodes.length) {
     const welcome = el("div", null, "welcome");
-    const mark = el("div", "π", "welcome-mark");
+    const mark = el("div", null, "welcome-mark");
+    const brand = el("img");
+    brand.src = "/ai-diy.png";
+    brand.alt = "";
+    brand.width = 36;
+    brand.height = 36;
+    mark.append(brand);
     welcome.append(mark, el("h2", "Чем помочь?"), el("p", "Опишите задачу — файлы появятся в папке проекта."));
     area.replaceChildren(welcome);
   } else {
@@ -4869,6 +4912,144 @@ function renderSubagentPage() {
   else pageNode.scrollTop = scroll;
 }
 
+/* ============================== window chrome ============================== */
+
+function faviconHref(kind) {
+  if (faviconCache.has(kind)) return faviconCache.get(kind);
+  if (!brandReady) return "/ai-diy-64.png";
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) return "/ai-diy-64.png";
+  if (typeof context.roundRect === "function") {
+    context.beginPath();
+    context.roundRect(0, 0, 64, 64, 14);
+    context.clip();
+  }
+  context.drawImage(brandImage, 0, 0, 64, 64);
+  const color = FAVICON_COLORS[kind];
+  if (color) {
+    context.beginPath();
+    context.arc(51, 51, 11, 0, Math.PI * 2);
+    context.fillStyle = color;
+    context.fill();
+    context.lineWidth = 6;
+    context.strokeStyle = "#0b1a33";
+    context.stroke();
+  }
+  const href = canvas.toDataURL("image/png");
+  faviconCache.set(kind, href);
+  return href;
+}
+
+function doneVisible() {
+  return doneUnread || (doneAt > 0 && Date.now() - doneAt < 8000);
+}
+
+function renderWindowChrome() {
+  const status = windowStatus({
+    busy: Boolean(state.busy),
+    compacting: Boolean(state.compacting),
+    voicePhase: state.voice?.phase,
+    loading: Boolean(state.loading || pending || uploading),
+    error: state.error,
+    done: doneVisible(),
+  });
+  const title = windowTitle(status, state.active?.name);
+  if (document.title !== title) document.title = title;
+  const link = $("favicon");
+  if (link) {
+    const href = faviconHref(status.kind);
+    if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+    if (link.getAttribute("type") !== "image/png") link.setAttribute("type", "image/png");
+  }
+}
+
+function markDone() {
+  doneAt = Date.now();
+  clearTimeout(doneTimer);
+  if (document.hidden) {
+    doneUnread = true;
+    return;
+  }
+  doneTimer = setTimeout(() => {
+    doneAt = 0;
+    renderWindowChrome();
+  }, 8000);
+}
+
+function clearDone() {
+  doneAt = 0;
+  doneUnread = false;
+  clearTimeout(doneTimer);
+  doneTimer = null;
+}
+
+function unlockChime() {
+  try {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioContext.state === "suspended") void audioContext.resume().catch(() => {});
+    if (!audioBuffer && !audioLoading) {
+      audioLoading = fetch("/sounds/done.mp3")
+        .then((response) => (response.ok ? response.arrayBuffer() : Promise.reject(new Error("no sound"))))
+        .then((data) => audioContext.decodeAudioData(data))
+        .then((buffer) => {
+          audioBuffer = buffer;
+        })
+        .catch(() => {})
+        .finally(() => {
+          audioLoading = null;
+        });
+    }
+  } catch {}
+}
+
+function playDoneChime() {
+  if (!soundEnabled) return;
+  if (!audioContext || audioContext.state !== "running" || !audioBuffer) return;
+  try {
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    const gain = audioContext.createGain();
+    gain.gain.value = 0.9;
+    source.connect(gain).connect(audioContext.destination);
+    source.start();
+  } catch {}
+}
+
+function renderSoundButton() {
+  const button = $("sound");
+  if (!button) return;
+  button.replaceChildren(icon(soundEnabled ? "volume" : "volume-off"));
+  button.title = soundEnabled ? "Звук завершения включён" : "Звук завершения выключен";
+  button.setAttribute("aria-label", "Звук завершения");
+  button.setAttribute("aria-pressed", String(soundEnabled));
+  button.classList.toggle("muted", !soundEnabled);
+}
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+    if (document.hidden) {
+      if (doneVisible()) doneUnread = true;
+    } else if (doneAt > 0) {
+      doneUnread = false;
+      doneAt = Date.now();
+      clearTimeout(doneTimer);
+      doneTimer = setTimeout(() => {
+        doneAt = 0;
+        renderWindowChrome();
+      }, 8000);
+    }
+    renderWindowChrome();
+    renderSoundButton();
+  },
+  { passive: true },
+);
+
+for (const type of ["pointerdown", "keydown", "touchstart"]) document.addEventListener(type, unlockChime, { passive: true });
+
 /* ============================== apply server state ============================== */
 
 function applyState(next) {
@@ -4890,8 +5071,18 @@ function applyState(next) {
   if (!next.busy) clockRequest = undefined;
   billingUI.update(next.billing, next.busy);
   const previous = state.active?.id;
+  const wasBusy = Boolean(state.busy);
   const previousName = state.active?.id && state.active.id === next.active?.id ? state.active.name : null;
   state = next;
+  if (next.busy) clearDone();
+  else if (wasBusy && !next.error && previous === next.active?.id) {
+    const lastAssistant = [...(next.messages || [])].reverse().find((message) => message.role === "assistant");
+    if (lastAssistant && lastAssistant.status !== "stopped" && !lastAssistant.error) {
+      playDoneChime();
+      markDone();
+    }
+  }
+  renderWindowChrome();
   if (typeof renderSubagents === "function") renderSubagents();
   if (previousName && state.active?.name && previousName !== state.active.name) {
     const project = projectOf(state.active.projectId);

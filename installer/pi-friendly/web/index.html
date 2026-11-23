@@ -3,17 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Просто pi</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23171717'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-style='italic' font-size='21' fill='%23fff' text-anchor='middle'%3E%CF%80%3C/text%3E%3C/svg%3E">
+  <title>AI DIY</title>
+  <link id="favicon" rel="icon" type="image/png" sizes="64x64" href="/ai-diy-64.png">
+  <link rel="apple-touch-icon" href="/ai-diy.png">
   <link rel="stylesheet" href="/app.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
   <div class="app">
     <aside class="sidebar" aria-label="Боковая панель">
-      <a class="brand" href="#" aria-label="Просто pi — проекты">
-        <span class="brand-mark" aria-hidden="true">π</span>
-        <span class="brand-name">Просто pi</span>
+      <a class="brand" href="#" aria-label="AI DIY — проекты">
+        <img class="brand-mark" src="/ai-diy.png" alt="" width="24" height="24">
+        <span class="brand-name">AI DIY</span>
       </a>
 
       <div class="sidebar-scroll">
@@ -67,6 +68,9 @@
           <button type="button" id="billing-open" title="Баланс и пополнение">
             <span class="nav-icon" data-icon="wallet" aria-hidden="true"></span>
             <span class="nav-text">Пополнить</span>
+          </button>
+          <button type="button" id="sound" class="icon-button" title="Звук завершения включён" aria-label="Звук завершения" aria-pressed="true">
+            <span data-icon="volume" aria-hidden="true"></span>
           </button>
           <button type="button" id="reload-page" class="icon-button" title="Перезагрузить страницу" aria-label="Перезагрузить страницу">
             <span data-icon="refresh" aria-hidden="true"></span>
@@ -352,7 +356,7 @@
   <div id="onboarding" class="onboarding">
     <div class="onboarding-card">
       <div id="onboarding-start" class="onboarding-step">
-        <div class="onboarding-mark" aria-hidden="true">π</div>
+        <div class="onboarding-mark" aria-hidden="true"><img src="/ai-diy.png" alt="" width="44" height="44"></div>
         <h1>С чего начнём?</h1>
         <div id="onboarding-loading" class="onboarding-loading" role="status">
           <span class="onboarding-loading-spinner" aria-hidden="true"></span>
@@ -431,7 +435,7 @@
   </dialog>
 
   <dialog id="exit-dialog">
-    <h2>Выйти из Просто pi?</h2>
+    <h2>Выйти из AI DIY?</h2>
     <p>Проекты и переписка сохранятся. Веб-интерфейс и программа pi завершат работу.</p>
     <div class="dialog-actions">
       <button type="button" id="cancel-exit">Отмена</button>
