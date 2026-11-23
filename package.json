@@ -1,10 +1,16 @@
 {
   "name": "pi-router-extension",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "type": "module",
   "description": "Universal model discovery and optional router progress for pi",
   "license": "MIT",
   "repository": "https://github.com/slavamirniy/pi-router-extension",
-  "pi": { "extensions": ["./index.ts"] },
-  "scripts": { "test": "node --test *.test.mjs installer/*.test.mjs" }
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "node --test *.test.mjs installer/*.test.mjs"
+  }
 }
