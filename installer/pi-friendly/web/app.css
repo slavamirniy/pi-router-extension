@@ -2248,7 +2248,10 @@ h1 {
   height: 14px;
 }
 #chat-menu-open {
-  color: var(--text);
+  color: #6b6b6b;
+}
+:root[data-theme="dark"] #chat-menu-open {
+  color: #b3b3b3;
 }
 #chat-menu-open svg {
   width: 21px;
