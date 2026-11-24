@@ -13,7 +13,7 @@ TASK_PROVIDER="${PI_PROVIDER_NAME:-router}"
 TASK_DEFAULT_MODEL="${PI_DEFAULT_MODEL:-}"
 TASK_CONFIG_DIR="${PI_CODING_AGENT_DIR:-}"
 unset PI_API_KEY PI_BASE_URL PI_PROVIDER_NAME PI_DEFAULT_MODEL
-TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/759baf9af86cb03e698d610e9b67a450e04e41b0"
+TASK_SOURCE="https://raw.githubusercontent.com/slavamirniy/pi-router-extension/7ec22b5b6dcf665aad12ddcf41f5a01daca591f4"
 [[ -n "$TASK_BASE_URL" ]] || { echo 'Set PI_BASE_URL to your API address, including /v1.' >&2; exit 1; }
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -245,7 +245,7 @@ installer/autoupdate/index.ts 80da32f295a23886f76b0ac0d2fd25c2662ce47ceca520bb86
 installer/autoupdate/update.mjs 7dc23c9ade8a379debe873aa230ae6890253ab90a29983f1f3640e73d17843ab
 installer/autoupdate/worker.mjs 069e1ca196a040236a6f77446058c0ceb0581d1677c546e179432c87ecc5bb44
 installer/autoupdate/trust.mjs af4d57b531555bd7102f1bf48dbbded9ad801a85cc9cb319d5e0c6b35859e07f
-installer/pi-friendly/bundle.json 8dcb2de60d930ecf425e05dc13e8742f7516bfca2cfa00b030a51519570af7ef
+installer/pi-friendly/bundle.json ccc50df22888db3ae61c13a868eb9f58461e09643d2cf1f14a3caf7789237c7b
 installer/pi-friendly/LICENSE 7619509f890e5995b858f525a59dad4346b788c598db54b6ad8f4e51cda7c1bd
 installer/pi-friendly/activity.mjs 753079e60811b8d61986db4da0a973ea91ea2e6b446095656a1e9650bd345821
 installer/pi-friendly/billing-panel.mjs 626d873c355d466d45c33b190dabaeeae5c5dd7153195421336c292f7019abda
@@ -266,7 +266,7 @@ installer/pi-friendly/menu.mjs 9ca8cadc393640c5b8982db2348ed6afa188875d02b8e8fb9
 installer/pi-friendly/model-picker.mjs b1780b708aea29663432a48b89401530e60b9016dc09a1227f960d65d586c689
 installer/pi-friendly/model-preference.mjs 91ab8ecfa8c38ab0dc103fadd60de50993d435ebb77a38408a5eb5a220cfd2af
 installer/pi-friendly/mouse.mjs 4f5c6433c8a8cd97020364a0777e650edb8552b4a8f5fd8ad0c51d1651e258e0
-installer/pi-friendly/package.json 6f4e652b92eef5208c188ac5571d1296d95cdcad3277db99de1e5f5e30fac30a
+installer/pi-friendly/package.json 09e7ecbdc2a6916dc464dabc72f549ebd6c16eb33096c696338c1ba1953d3202
 installer/pi-friendly/project-form.mjs 990d61dab347a589bfe9c6bdd5f066c082b1d02f1b1487f92d4e41df573bc6c0
 installer/pi-friendly/projects.mjs a20425991e8bd30722f5ed1258b63c71555a999ec171bb6d2c95afa5a5843e03
 installer/pi-friendly/router/LICENSE 7aeb0fefd5b229a189394de001b6125e3e59a43135647b82c74cf739ca38a710
@@ -293,7 +293,7 @@ installer/pi-friendly/web-messages.mjs adafd0d6ed97106947fe6ad5c699c7745514e0039
 installer/pi-friendly/web-rpc.mjs 7d71f7a85c630699db1fa26239e7a3f8794b22d258d9320ba844dff8b52cca16
 installer/pi-friendly/web-server.mjs 6e471247a86dc98c3407e0aa5645f76493c86dea6464d97860e90a4c0a86f315
 installer/pi-friendly/web/ai-diy.png ce353036890960615073158ff65bb5dc392104371e3110e3c1bb42c40f0c83dd
-installer/pi-friendly/web/app.css e5f110eec8e33b0fae731541ffc2c235a63fe67e30e1f05c7c98198e0cc5c2c9
+installer/pi-friendly/web/app.css 56bd976ac563d11b617adb742daa87eba141c00975595d7a3278b5fb71fb9850
 installer/pi-friendly/web/app.js 326d37e5452bc934438f48b6bb750095f07007232e38f26fb0aad5fa25d5d359
 installer/pi-friendly/web/attachments.js 49366bf020821f68ff0f96395d1f8c9e12d8d4b0a8075ecdf65561a095ec8d5e
 installer/pi-friendly/web/billing-ui.js 908cdbe3cbb94fa2eb6e3ab8c1c5d22c92d176644ebc45f6e7743639fca2cf17
